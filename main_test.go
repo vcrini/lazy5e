@@ -1105,6 +1105,44 @@ func TestEncounterSkillBonusCustomFromBuildAndPerceptionFallback(t *testing.T) {
 	}
 }
 
+func TestEncounterSaveBonusMonsterAndFallback(t *testing.T) {
+	ui := makeTestUI(t, []Monster{
+		{
+			ID:   1,
+			Name: "Guard",
+			Raw: map[string]any{
+				"con": 16,
+				"save": map[string]any{
+					"wis": "+4",
+				},
+			},
+		},
+	})
+	entry := EncounterEntry{MonsterIndex: 0}
+	if got, ok := ui.encounterSaveBonus(entry, "Wisdom"); !ok || got != 4 {
+		t.Fatalf("expected explicit wisdom save +4, got %d ok=%v", got, ok)
+	}
+	if got, ok := ui.encounterSaveBonus(entry, "Constitution"); !ok || got != 3 {
+		t.Fatalf("expected con fallback +3, got %d ok=%v", got, ok)
+	}
+}
+
+func TestEncounterSaveBonusCustomFromBuild(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "A", 10, 10, "1d1")})
+	entry := EncounterEntry{
+		Custom: true,
+		Character: &CharacterBuild{
+			BaseScores: []int{18, 10, 12, 8, 14, 16},
+		},
+	}
+	if got, ok := ui.encounterSaveBonus(entry, "Strength"); !ok || got != 4 {
+		t.Fatalf("expected str mod +4, got %d ok=%v", got, ok)
+	}
+	if got, ok := ui.encounterSaveBonus(entry, "Charisma"); !ok || got != 3 {
+		t.Fatalf("expected cha mod +3, got %d ok=%v", got, ok)
+	}
+}
+
 func TestEncounterConditionsBadgeAndRoundProgress(t *testing.T) {
 	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
 	ui.encounterItems = []EncounterEntry{

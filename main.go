@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] K[-:-] skill check  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
+	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] K[-:-] skill check  [black:gold] V[-:-] saving throw  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
 	defaultAppDirName     = ".lazy5e"
 	defaultEncountersFile = "encounters.yaml"
 	lastEncountersFile    = ".encounters_last_path"
@@ -285,6 +285,11 @@ type skillDef struct {
 	Ability string
 }
 
+type saveDef struct {
+	Name string
+	Key  string
+}
+
 type encounterXPThreshold struct {
 	Easy   int
 	Medium int
@@ -341,6 +346,15 @@ var skillDefs = []skillDef{
 	{Name: "Sleight of Hand", Ability: "dex"},
 	{Name: "Stealth", Ability: "dex"},
 	{Name: "Survival", Ability: "wis"},
+}
+
+var saveDefs = []saveDef{
+	{Name: "Strength", Key: "str"},
+	{Name: "Dexterity", Key: "dex"},
+	{Name: "Constitution", Key: "con"},
+	{Name: "Intelligence", Key: "int"},
+	{Name: "Wisdom", Key: "wis"},
+	{Name: "Charisma", Key: "cha"},
 }
 
 var encounterXPThresholdByLevel = map[int]encounterXPThreshold{
@@ -524,6 +538,7 @@ type UI struct {
 	itemTreasureVisible  bool
 	spellTreasureVisible bool
 	skillCheckVisible    bool
+	saveCheckVisible     bool
 }
 
 func main() {
@@ -966,7 +981,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			// While modal is open, do not process global shortcuts (1/2/3/q/...).
 			return event
 		}
-		if ui.skillCheckVisible {
+		if ui.skillCheckVisible || ui.saveCheckVisible {
 			// While skill check modal is open, do not process global shortcuts (1/2/3/...).
 			return event
 		}
@@ -1259,6 +1274,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'K':
 			ui.openEncounterSkillCheckModal()
 			return nil
+		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'V':
+			ui.openEncounterSaveCheckModal()
+			return nil
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'S':
 			ui.sortEncounterByInitiative()
 			return nil
@@ -1498,6 +1516,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  i : roll initiative for selected entry\n" +
 			"  I : roll initiative for all entries\n" +
 			"  K : roll a skill check (editable bonus)\n" +
+			"  V : roll a saving throw (editable bonus)\n" +
 			"  S : sort entries by initiative roll\n" +
 			"  * : toggle turn mode\n" +
 			"  n / p : next / previous turn\n" +
@@ -11384,6 +11403,102 @@ func (ui *UI) encounterSkillBonus(entry EncounterEntry, skill string) (int, bool
 	return skillBonusFromMonster(ui.monsters[entry.MonsterIndex].Raw, skill)
 }
 
+func saveKeyFromName(name string) string {
+	for _, d := range saveDefs {
+		if strings.EqualFold(strings.TrimSpace(d.Name), strings.TrimSpace(name)) {
+			return d.Key
+		}
+	}
+	return ""
+}
+
+func saveBonusFromMonster(raw map[string]any, saveKey string) (int, bool) {
+	if raw == nil || strings.TrimSpace(saveKey) == "" {
+		return 0, false
+	}
+	if saves, ok := raw["save"].(map[string]any); ok {
+		if v, ok := saves[saveKey]; ok {
+			if n, ok := signedIntFromAny(v); ok {
+				return n, true
+			}
+		}
+		for k, v := range saves {
+			if strings.EqualFold(strings.TrimSpace(k), saveKey) {
+				if n, ok := signedIntFromAny(v); ok {
+					return n, true
+				}
+			}
+		}
+	}
+	if saves, ok := raw["save"].(map[any]any); ok {
+		for k, v := range saves {
+			if strings.EqualFold(strings.TrimSpace(asString(k)), saveKey) {
+				if n, ok := signedIntFromAny(v); ok {
+					return n, true
+				}
+			}
+		}
+	}
+	if score, ok := anyToInt(raw[saveKey]); ok {
+		return abilityMod(score), true
+	}
+	return 0, false
+}
+
+func saveBonusFromCharacterBuild(build *CharacterBuild, saveKey string) (int, bool) {
+	if build == nil || len(build.BaseScores) < 6 || strings.TrimSpace(saveKey) == "" {
+		return 0, false
+	}
+	idx := map[string]int{"str": 0, "dex": 1, "con": 2, "int": 3, "wis": 4, "cha": 5}[saveKey]
+	if idx < 0 || idx >= len(build.BaseScores) {
+		return 0, false
+	}
+	return abilityMod(build.BaseScores[idx]), true
+}
+
+func parseNamedSaveBonusFromText(text string, saveName string) (int, bool) {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" || strings.TrimSpace(saveName) == "" {
+		return 0, false
+	}
+	// Accept patterns like:
+	// "Strength: +5", "Strength Save: +5", "STR +5"
+	pattern := `(?mi)^\s*(?:` + regexp.QuoteMeta(saveName) + `|` + regexp.QuoteMeta(strings.ToUpper(saveName[:3])) + `)(?:\s+save)?\s*[: ]+\s*([+-]?\d+)\s*$`
+	re := regexp.MustCompile(pattern)
+	m := re.FindStringSubmatch(trimmed)
+	if len(m) < 2 {
+		return 0, false
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(m[1]))
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func (ui *UI) encounterSaveBonus(entry EncounterEntry, saveName string) (int, bool) {
+	saveKey := saveKeyFromName(saveName)
+	if saveKey == "" {
+		return 0, false
+	}
+	if entry.Custom {
+		if v, ok := saveBonusFromCharacterBuild(entry.Character, saveKey); ok {
+			return v, true
+		}
+		if v, ok := parseNamedSaveBonusFromText(entry.CustomMeta, saveName); ok {
+			return v, true
+		}
+		if v, ok := parseNamedSaveBonusFromText(entry.CustomBody, saveName); ok {
+			return v, true
+		}
+		return 0, false
+	}
+	if entry.MonsterIndex < 0 || entry.MonsterIndex >= len(ui.monsters) {
+		return 0, false
+	}
+	return saveBonusFromMonster(ui.monsters[entry.MonsterIndex].Raw, saveKey)
+}
+
 func (ui *UI) openEncounterSkillCheckModal() {
 	if len(ui.encounterItems) == 0 {
 		return
@@ -11543,6 +11658,168 @@ func (ui *UI) openEncounterSkillCheckModal() {
 
 	ui.pages.AddPage("encounter-skill-check", modal, true, true)
 	ui.skillCheckVisible = true
+	ui.app.SetFocus(form)
+}
+
+func (ui *UI) openEncounterSaveCheckModal() {
+	if len(ui.encounterItems) == 0 {
+		return
+	}
+	index := ui.encounter.GetCurrentItem()
+	if index < 0 || index >= len(ui.encounterItems) {
+		return
+	}
+	entry := ui.encounterItems[index]
+
+	saveNames := make([]string, 0, len(saveDefs))
+	for _, d := range saveDefs {
+		saveNames = append(saveNames, d.Name)
+	}
+
+	saveDrop := tview.NewDropDown().SetLabel("Save: ")
+	saveDrop.SetOptions(saveNames, nil)
+	saveDrop.SetCurrentOption(0)
+	saveDrop.SetLabelColor(tcell.ColorGold)
+	saveDrop.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
+	saveDrop.SetFieldTextColor(tcell.ColorWhite)
+	saveDrop.SetListStyles(
+		tcell.StyleDefault.Background(tcell.ColorDarkSlateGray).Foreground(tcell.ColorWhite),
+		tcell.StyleDefault.Background(tcell.ColorGold).Foreground(tcell.ColorBlack),
+	)
+
+	bonusField := tview.NewInputField().SetLabel("Bonus: ").SetFieldWidth(8)
+	bonusField.SetLabelColor(tcell.ColorGold)
+	bonusField.SetFieldBackgroundColor(tcell.ColorWhite)
+	bonusField.SetFieldTextColor(tcell.ColorBlack)
+	bonusField.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+
+	fillBonus := func(save string) {
+		if b, ok := ui.encounterSaveBonus(entry, save); ok {
+			bonusField.SetText(strconv.Itoa(b))
+			return
+		}
+		bonusField.SetText("")
+	}
+	fillBonus(saveNames[0])
+	saveDrop.SetSelectedFunc(func(text string, _ int) {
+		fillBonus(text)
+	})
+
+	form := tview.NewForm()
+	form.SetBorder(true)
+	form.SetTitle(" Saving Throw ")
+	form.SetBorderColor(tcell.ColorGold)
+	form.SetTitleColor(tcell.ColorGold)
+	form.SetButtonsAlign(tview.AlignCenter)
+	form.SetButtonBackgroundColor(tcell.ColorGold)
+	form.SetButtonTextColor(tcell.ColorBlack)
+	form.SetBackgroundColor(tcell.ColorBlack)
+	form.AddFormItem(saveDrop)
+	form.AddFormItem(bonusField)
+
+	closeModal := func() {
+		ui.pages.RemovePage("encounter-save-check")
+		ui.saveCheckVisible = false
+		ui.app.SetFocus(ui.encounter)
+	}
+	rollNow := func() {
+		_, save := saveDrop.GetCurrentOption()
+		bonusText := strings.TrimSpace(bonusField.GetText())
+		if bonusText == "" {
+			bonusText = "0"
+		}
+		bonus, err := strconv.Atoi(bonusText)
+		if err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid save bonus[-:-] \"%s\"  %s", bonusText, helpText))
+			return
+		}
+		roll := rand.Intn(20) + 1
+		total := roll + bonus
+		sign := "+"
+		if bonus < 0 {
+			sign = ""
+		}
+		ui.status.SetText(fmt.Sprintf(" [black:gold] save[-:-] %s %s d20(%d) %s%d = %d  %s",
+			ui.encounterEntryDisplay(entry), save, roll, sign, bonus, total, helpText))
+		closeModal()
+	}
+
+	form.AddButton("Roll", rollNow)
+	form.AddButton("Cancel", closeModal)
+	form.SetCancelFunc(closeModal)
+
+	saveDrop.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEnter, tcell.KeyTab:
+			form.SetFocus(1)
+		case tcell.KeyEscape:
+			closeModal()
+		}
+	})
+	saveDrop.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyTab:
+			form.SetFocus(1)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(3)
+			return nil
+		case tcell.KeyEnter:
+			if !saveDrop.IsOpen() {
+				form.SetFocus(1)
+				return nil
+			}
+			return event
+		case tcell.KeyEscape:
+			if saveDrop.IsOpen() {
+				return event
+			}
+			closeModal()
+			return nil
+		default:
+			return event
+		}
+	})
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && event.Rune() == 'q') {
+			closeModal()
+			return nil
+		}
+		return event
+	})
+	bonusField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEnter:
+			rollNow()
+			return nil
+		case tcell.KeyTab:
+			form.SetFocus(2)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(0)
+			return nil
+		case tcell.KeyEscape:
+			closeModal()
+			return nil
+		default:
+			if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+				closeModal()
+				return nil
+			}
+			return event
+		}
+	})
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(form, 10, 0, true).
+			AddItem(nil, 0, 1, false), 56, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	ui.pages.AddPage("encounter-save-check", modal, true, true)
+	ui.saveCheckVisible = true
 	ui.app.SetFocus(form)
 }
 
