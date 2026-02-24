@@ -30,7 +30,8 @@ func makeTestUI(t *testing.T, monsters []Monster) *UI {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "encounters.yaml")
 	dicePath := filepath.Join(t.TempDir(), "dice.yaml")
-	ui := newUI(monsters, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, path, dicePath)
+	randomPath := filepath.Join(t.TempDir(), "random.yaml")
+	ui := newUI(monsters, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, path, dicePath, randomPath)
 	return ui
 }
 
@@ -38,6 +39,7 @@ func makeCharacterUI(t *testing.T) *UI {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "encounters.yaml")
 	dicePath := filepath.Join(t.TempDir(), "dice.yaml")
+	randomPath := filepath.Join(t.TempDir(), "random.yaml")
 	classes := []Monster{
 		{
 			Name:        "Wizard",
@@ -64,7 +66,7 @@ func makeCharacterUI(t *testing.T) *UI {
 			},
 		},
 	}
-	return newUI(nil, nil, nil, classes, races, nil, nil, nil, nil, nil, nil, path, dicePath)
+	return newUI(nil, nil, nil, classes, races, nil, nil, nil, nil, nil, nil, path, dicePath, randomPath)
 }
 
 func TestLoadMonstersFromBytes(t *testing.T) {
@@ -836,7 +838,8 @@ func TestSetFilterOptionsForItemsAndSpellsPopulateEnv(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "encounters.yaml")
 	dicePath := filepath.Join(t.TempDir(), "dice.yaml")
-	ui := newUI(monsters, items, spells, nil, nil, nil, nil, nil, nil, nil, nil, path, dicePath)
+	randomPath := filepath.Join(t.TempDir(), "random.yaml")
+	ui := newUI(monsters, items, spells, nil, nil, nil, nil, nil, nil, nil, nil, path, dicePath, randomPath)
 
 	ui.browseMode = BrowseItems
 	ui.setFilterOptionsForMode()
@@ -870,7 +873,8 @@ func TestEmbeddedItemsAndSpellsEnvOptionsNotOnlyAll(t *testing.T) {
 	monsters := []Monster{mkMonster(1, "A", 10, 5, "1d1")}
 	path := filepath.Join(t.TempDir(), "encounters.yaml")
 	dicePath := filepath.Join(t.TempDir(), "dice.yaml")
-	ui := newUI(monsters, items, spells, nil, nil, nil, nil, nil, nil, nil, nil, path, dicePath)
+	randomPath := filepath.Join(t.TempDir(), "random.yaml")
+	ui := newUI(monsters, items, spells, nil, nil, nil, nil, nil, nil, nil, nil, path, dicePath, randomPath)
 
 	ui.browseMode = BrowseItems
 	ui.setFilterOptionsForMode()
@@ -928,7 +932,7 @@ func TestSaveLoadEncountersRoundTrip(t *testing.T) {
 
 	monsters := []Monster{mkMonster(100, "A", 12, 13, "3d8"), mkMonster(200, "B", 14, 20, "4d8")}
 	path := filepath.Join(tmp, "my-enc.yaml")
-	ui := newUI(monsters, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, path, filepath.Join(tmp, "dice.yaml"))
+	ui := newUI(monsters, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, path, filepath.Join(tmp, "dice.yaml"), filepath.Join(tmp, "random.yaml"))
 	ui.encounterItems = []EncounterEntry{
 		{MonsterIndex: 0, Ordinal: 1, BaseHP: 13, CurrentHP: 8, HPFormula: "3d8", UseRolledHP: true, RolledHP: 10, HasInitRoll: true, InitRoll: 15},
 		{MonsterIndex: 1, Ordinal: 1, BaseHP: 20, CurrentHP: 20, HPFormula: "4d8", UseRolledHP: false, RolledHP: 0, HasInitRoll: false, InitRoll: 0},
@@ -943,7 +947,7 @@ func TestSaveLoadEncountersRoundTrip(t *testing.T) {
 		t.Fatalf("saveEncountersAs failed: %v", err)
 	}
 
-	ui2 := newUI(monsters, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, path, filepath.Join(tmp, "dice.yaml"))
+	ui2 := newUI(monsters, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, path, filepath.Join(tmp, "dice.yaml"), filepath.Join(tmp, "random.yaml"))
 	if err := ui2.loadEncounters(); err != nil {
 		t.Fatalf("loadEncounters failed: %v", err)
 	}
@@ -1140,6 +1144,35 @@ func TestEncounterSaveBonusCustomFromBuild(t *testing.T) {
 	}
 	if got, ok := ui.encounterSaveBonus(entry, "Charisma"); !ok || got != 3 {
 		t.Fatalf("expected cha mod +3, got %d ok=%v", got, ok)
+	}
+}
+
+func TestRandomPanelGeneratorsAppendEntries(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "A", 10, 10, "1d1")})
+	ui.setBrowseMode(BrowseRandom)
+	initial := len(ui.randoms)
+	ui.generateRandomDungeonRoom()
+	ui.generateRandomNPC()
+	ui.generateRandomTreasureTheme()
+	if len(ui.randoms) != initial+3 {
+		t.Fatalf("expected 3 random entries appended, got %d -> %d", initial, len(ui.randoms))
+	}
+	last := ui.randoms[len(ui.randoms)-1]
+	if strings.TrimSpace(last.Name) == "" || strings.TrimSpace(asString(last.Raw["content"])) == "" {
+		t.Fatalf("expected populated random entry, got %#v", last)
+	}
+}
+
+func TestRandomEntriesWithSameNameAreNumbered(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "A", 10, 10, "1d1")})
+	ui.setBrowseMode(BrowseRandom)
+	ui.addRandomEntry("Adventure", "Divination & Plot Hook", "first")
+	ui.addRandomEntry("Adventure", "Divination & Plot Hook", "second")
+	if got := ui.randoms[0].Name; got != "Divination & Plot Hook #1" {
+		t.Fatalf("unexpected first random title: %q", got)
+	}
+	if got := ui.randoms[1].Name; got != "Divination & Plot Hook #2" {
+		t.Fatalf("unexpected second random title: %q", got)
 	}
 }
 

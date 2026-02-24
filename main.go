@@ -33,6 +33,8 @@ const (
 	lastEncountersFile    = ".encounters_last_path"
 	defaultDiceFile       = "dice.yaml"
 	lastDiceFile          = ".dice_last_path"
+	defaultRandomFile     = "random.yaml"
+	lastRandomFile        = ".random_last_path"
 	defaultBuildFile      = "character_build.yaml"
 	lastBuildFile         = ".character_build_last_path"
 	filtersStateFile      = ".filters_state.yaml"
@@ -79,6 +81,7 @@ const (
 	BrowseFeats
 	BrowseBooks
 	BrowseAdventures
+	BrowseRandom
 )
 
 type Monster struct {
@@ -196,6 +199,18 @@ type PersistedDice struct {
 	Items   []DiceResult `yaml:"items"`
 }
 
+type PersistedRandom struct {
+	Version int                   `yaml:"version"`
+	Items   []PersistedRandomItem `yaml:"items"`
+}
+
+type PersistedRandomItem struct {
+	Name      string `yaml:"name"`
+	Category  string `yaml:"category,omitempty"`
+	Generated string `yaml:"generated,omitempty"`
+	Content   string `yaml:"content,omitempty"`
+}
+
 type PersistedFilterMode struct {
 	Name    string   `yaml:"name,omitempty"`
 	Env     string   `yaml:"env,omitempty"`
@@ -215,6 +230,7 @@ type PersistedFilters struct {
 	Feats    PersistedFilterMode `yaml:"feats,omitempty"`
 	Books    PersistedFilterMode `yaml:"books,omitempty"`
 	Advs     PersistedFilterMode `yaml:"adventures,omitempty"`
+	Random   PersistedFilterMode `yaml:"random,omitempty"`
 }
 
 type PersistedDescriptionScroll struct {
@@ -464,6 +480,7 @@ type UI struct {
 	feats         []Monster
 	books         []Monster
 	adventures    []Monster
+	randoms       []Monster
 	browseMode    BrowseMode
 	filtered      []int
 	envOptions    []string
@@ -515,6 +532,7 @@ type UI struct {
 	encounterItems  []EncounterEntry
 	encountersPath  string
 	dicePath        string
+	randomPath      string
 	buildPath       string
 	encounterUndo   []EncounterUndoState
 	encounterRedo   []EncounterUndoState
@@ -554,12 +572,16 @@ func main() {
 	yamlPath := strings.TrimSpace(os.Getenv("MONSTERS_YAML"))
 	encountersPath := strings.TrimSpace(os.Getenv("ENCOUNTERS_YAML"))
 	dicePath := strings.TrimSpace(os.Getenv("DICE_YAML"))
+	randomPath := strings.TrimSpace(os.Getenv("RANDOM_LIST_YAML"))
 	buildPath := strings.TrimSpace(os.Getenv("CHARACTER_BUILD_YAML"))
 	if encountersPath == "" {
 		encountersPath = readLastEncountersPath()
 	}
 	if dicePath == "" {
 		dicePath = readLastDicePath()
+	}
+	if randomPath == "" {
+		randomPath = readLastRandomPath()
 	}
 	if buildPath == "" {
 		buildPath = readLastBuildPath()
@@ -620,7 +642,7 @@ func main() {
 		log.Fatalf("loading error adventure YAML embedded: %v", err)
 	}
 
-	ui := newUI(monsters, items, spells, classes, races, feats, books, advs, envs, crs, types, encountersPath, dicePath)
+	ui := newUI(monsters, items, spells, classes, races, feats, books, advs, envs, crs, types, encountersPath, dicePath, randomPath)
 	ui.buildPath = buildPath
 	if err := ui.run(); err != nil {
 		log.Fatal(err)
@@ -639,7 +661,7 @@ func main() {
 	}
 }
 
-func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster, envs, crs, types []string, encountersPath string, dicePath string) *UI {
+func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster, envs, crs, types []string, encountersPath string, dicePath string, randomPath string) *UI {
 	setTheme()
 
 	ui := &UI{
@@ -652,6 +674,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		feats:             feats,
 		books:             books,
 		adventures:        advs,
+		randoms:           []Monster{},
 		browseMode:        BrowseMonsters,
 		sourceFilters:     map[string]struct{}{},
 		envOptions:        append([]string{"All"}, envs...),
@@ -663,6 +686,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		encounterItems:    make([]EncounterEntry, 0, 16),
 		encountersPath:    encountersPath,
 		dicePath:          dicePath,
+		randomPath:        randomPath,
 		buildPath:         readLastBuildPath(),
 		modeFilters:       map[BrowseMode]PersistedFilterMode{},
 		monsterScale:      map[int]int{},
@@ -938,6 +962,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	ui.modeFilters[BrowseFeats] = PersistedFilterMode{}
 	ui.modeFilters[BrowseBooks] = PersistedFilterMode{}
 	ui.modeFilters[BrowseAdventures] = PersistedFilterMode{}
+	ui.modeFilters[BrowseRandom] = PersistedFilterMode{}
 	if err := ui.loadFilterStates(); err != nil {
 		ui.status.SetText(fmt.Sprintf(" [white:red] loading error filters[-:-] %v  %s", err, helpText))
 	}
@@ -1082,6 +1107,48 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 				ui.openCreateCharacterFromClassForm()
 				return nil
 			}
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'g':
+			ui.generateRandomDungeonRoom()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'y':
+			ui.generateRandomDungeonLayout()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'n':
+			ui.generateRandomNPC()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'p':
+			ui.generateRandomPlace()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'o':
+			ui.generateRandomSocialEvent()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 't':
+			ui.generateRandomTreasureTheme()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'm':
+			ui.generateRandomMagicItemTheme()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'u':
+			ui.generateRandomCurrencyTheme()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'e':
+			ui.generateRandomAdventureEvent()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'h':
+			ui.generateRandomPlotHook()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'd':
+			ui.deleteSelectedRandomEntry()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'D':
+			ui.clearAllRandomEntries()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'S':
+			ui.openRandomSaveAsInput()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'L':
+			ui.openRandomLoadInput()
 			return nil
 		case focus == ui.list && event.Key() == tcell.KeyRune && event.Rune() == 'n':
 			ui.app.SetFocus(ui.nameInput)
@@ -1348,6 +1415,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == 'v':
 			ui.setBrowseMode(BrowseAdventures)
 			return nil
+		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == 'z':
+			ui.setBrowseMode(BrowseRandom)
+			return nil
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == '[':
 			ui.cycleBrowseMode(-1)
 			return nil
@@ -1438,6 +1508,8 @@ func (ui *UI) panelNameForFocus(focus tview.Primitive) string {
 			return "Races"
 		case BrowseFeats:
 			return "Feats"
+		case BrowseRandom:
+			return "Random"
 		default:
 			return "Monsters"
 		}
@@ -1472,7 +1544,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		"  0 / 1 / 2 / 3 : go to Dice / Encounters / Catalog / Description\n" +
 		"  [ / ] : previous/next browse panel\n" +
 		"  4 / 5 / 6 / 7 / 8 / 9 : Monsters / Items / Spells / Characters / Races / Feats\n" +
-		"  b / v : Manuals / Adventures\n\n"
+		"  b / v / z : Manuals / Adventures / Random\n\n"
 
 	switch focus {
 	case ui.dice:
@@ -1599,6 +1671,25 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"  n / e / s / c / t : focus on Name / Group / Source(multi) / Year / Author\n" +
 				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats/Manuals/Adventures panel\n" +
 				"  PgUp / PgDn : scroll Description panel\n"
+		}
+		if ui.browseMode == BrowseRandom {
+			return header +
+				"[black:gold]Random[-:-]\n" +
+				"  g : dungeon room contents (traps/treasure/monsters/puzzles)\n" +
+				"  y : dungeon layout (doors/corridors/hazards)\n" +
+				"  n : NPC (name/traits/motivation/profession)\n" +
+				"  p : place name (tavern/ship/fortress)\n" +
+				"  o : social event / ethnic tension\n" +
+				"  t : treasure cache (individual/hoard style)\n" +
+				"  m : magic item (by rarity/category)\n" +
+				"  u : random currency / trade bars / art objects\n" +
+				"  e : adventure event (wilderness/chase/stronghold)\n" +
+				"  h : divination / plot hook\n" +
+				"  d : delete selected random entry\n" +
+				"  D : clear all random entries\n" +
+				"  S : save random list as\n" +
+				"  L : load random list\n" +
+				"  x : clear all filters\n"
 		}
 		if ui.browseMode == BrowseRaces {
 			return header +
@@ -3020,6 +3111,8 @@ func (ui *UI) browseModeName() string {
 		return "Manuals"
 	case BrowseAdventures:
 		return "Adventures"
+	case BrowseRandom:
+		return "Random"
 	default:
 		return "Monsters"
 	}
@@ -3041,6 +3134,8 @@ func (ui *UI) activeEntries() []Monster {
 		return ui.books
 	case BrowseAdventures:
 		return ui.adventures
+	case BrowseRandom:
+		return ui.randoms
 	default:
 		return ui.monsters
 	}
@@ -3274,6 +3369,26 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.sourceOptions = append(ui.sourceOptions, keysSorted(seenSource)...)
 		ui.crOptions = append(ui.crOptions, keysSorted(seenYear)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenAuthor)...)
+	case BrowseRandom:
+		ui.nameInput.SetLabel(" Name ")
+		ui.envDrop.SetLabel(" Category ")
+		ui.sourceDrop.SetLabel(" Source ")
+		ui.crDrop.SetLabel(" Group ")
+		ui.typeDrop.SetLabel(" Type ")
+		ui.envOptions = []string{"All"}
+		ui.sourceOptions = []string{"All"}
+		ui.crOptions = []string{"All"}
+		ui.typeOptions = []string{"All"}
+		seenCat := map[string]struct{}{}
+		for _, it := range ui.randoms {
+			if s := strings.TrimSpace(it.CR); s != "" {
+				seenCat[s] = struct{}{}
+			}
+		}
+		ui.envOptions = append(ui.envOptions, keysSorted(seenCat)...)
+		ui.sourceOptions = append(ui.sourceOptions, []string{}...)
+		ui.crOptions = append(ui.crOptions, []string{}...)
+		ui.typeOptions = append(ui.typeOptions, []string{}...)
 	default:
 		ui.nameInput.SetLabel(" Name ")
 		ui.envDrop.SetLabel(" Env ")
@@ -3659,7 +3774,7 @@ func (ui *UI) collectMonsterTypeOptions() []string {
 }
 
 func (ui *UI) updateBrowsePanelTitle() {
-	count := 8
+	count := 9
 	prev := BrowseMode((int(ui.browseMode) - 1 + count) % count)
 	next := BrowseMode((int(ui.browseMode) + 1) % count)
 	ui.monstersPanel.SetTitle(fmt.Sprintf(" [2]-%s  [:%s  ]:%s ", ui.browseModeName(), browseModeLabel(prev), browseModeLabel(next)))
@@ -3669,7 +3784,7 @@ func (ui *UI) cycleBrowseMode(delta int) {
 	if delta == 0 {
 		return
 	}
-	count := 8
+	count := 9
 	next := (int(ui.browseMode) + delta) % count
 	if next < 0 {
 		next += count
@@ -3693,6 +3808,8 @@ func browseModeLabel(mode BrowseMode) string {
 		return "Manuals"
 	case BrowseAdventures:
 		return "Adventures"
+	case BrowseRandom:
+		return "Random"
 	default:
 		return "Monsters"
 	}
@@ -3791,6 +3908,8 @@ func (ui *UI) renderDetailByListIndex(listIndex int) {
 		ui.renderDetailByBookIndex(activeIndex)
 	case BrowseAdventures:
 		ui.renderDetailByAdventureIndex(activeIndex)
+	case BrowseRandom:
+		ui.renderDetailByRandomIndex(activeIndex)
 	default:
 		ui.renderDetailByMonsterIndex(activeIndex)
 	}
@@ -4066,6 +4185,429 @@ func (ui *UI) renderDetailByAdventureIndex(adventureIndex int) {
 	ui.rawQuery = ""
 	ui.renderRawWithHighlight("", -1)
 	ui.detailRaw.ScrollToBeginning()
+}
+
+func (ui *UI) renderDetailByRandomIndex(randomIndex int) {
+	if randomIndex < 0 || randomIndex >= len(ui.randoms) {
+		return
+	}
+	it := ui.randoms[randomIndex]
+	builder := &strings.Builder{}
+	fmt.Fprintf(builder, "[yellow]%s[-]\n", it.Name)
+	fmt.Fprintf(builder, "[white]Category:[-] %s\n", blankIfEmpty(it.CR, "n/a"))
+	if gen := strings.TrimSpace(asString(it.Raw["generated"])); gen != "" {
+		fmt.Fprintf(builder, "[white]Generated:[-] %s\n", gen)
+	}
+	ui.detailMeta.SetText(builder.String())
+	ui.detailMeta.ScrollToBeginning()
+	ui.rawText = strings.TrimSpace(asString(it.Raw["content"]))
+	ui.rawQuery = ""
+	ui.renderRawWithHighlight("", -1)
+	ui.detailRaw.ScrollToBeginning()
+}
+
+func chooseOne(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[rand.Intn(len(values))]
+}
+
+func baseRandomTitle(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return ""
+	}
+	return strings.TrimSpace(numSuffixRe.ReplaceAllString(trimmed, ""))
+}
+
+func (ui *UI) nextRandomTitleOrdinal(title string) int {
+	base := baseRandomTitle(title)
+	if base == "" {
+		return 1
+	}
+	count := 0
+	for _, it := range ui.randoms {
+		if strings.EqualFold(baseRandomTitle(it.Name), base) {
+			count++
+		}
+	}
+	return count + 1
+}
+
+func (ui *UI) addRandomEntry(category string, title string, body string) {
+	category = strings.TrimSpace(category)
+	title = strings.TrimSpace(title)
+	body = strings.TrimSpace(body)
+	if title == "" || body == "" {
+		return
+	}
+	title = fmt.Sprintf("%s #%d", baseRandomTitle(title), ui.nextRandomTitleOrdinal(title))
+	it := Monster{
+		ID:          len(ui.randoms) + 1,
+		Name:        title,
+		CR:          category,
+		Environment: []string{category},
+		Source:      "random",
+		Type:        "generated",
+		Raw: map[string]any{
+			"name":      title,
+			"category":  category,
+			"generated": time.Now().Format("2006-01-02 15:04:05"),
+			"content":   body,
+		},
+	}
+	ui.randoms = append(ui.randoms, it)
+	ui.applyFilters()
+	ui.status.SetText(fmt.Sprintf(" [black:gold]random[-:-] generated %s  %s", title, helpText))
+	if ui.browseMode != BrowseRandom {
+		return
+	}
+	target := len(ui.randoms) - 1
+	for i, idx := range ui.filtered {
+		if idx == target {
+			ui.list.SetCurrentItem(i)
+			ui.renderDetailByListIndex(i)
+			break
+		}
+	}
+}
+
+func (ui *UI) generateRandomDungeonRoom() {
+	roomKinds := []string{"Collapsed armory", "Flooded shrine", "Arcane vault", "Desecrated chapel", "Forgotten barracks", "Bone archive"}
+	traps := []string{"pressure plate dart launcher", "swinging blade pendulum", "glyph of frost", "poison needle lock", "falling block trap"}
+	treasures := []string{"sealed coffer of silver trade bars", "dusty chest with mixed coinage", "hidden compartment with gemstones", "ancient art object wrapped in oilcloth"}
+	monsters := []string{"restless undead sentry", "ooze feeding on refuse", "ambush drakes", "cultist remnant patrol", "territorial giant spiders"}
+	puzzles := []string{"rotating runes requiring elemental sequence", "weight-balance altar puzzle", "mirrored light-beam lock", "musical chime door mechanism"}
+	title := "Dungeon Room Content"
+	body := fmt.Sprintf("Room: %s\nTrap: %s\nTreasure: %s\nMonster: %s\nPuzzle: %s",
+		chooseOne(roomKinds), chooseOne(traps), chooseOne(treasures), chooseOne(monsters), chooseOne(puzzles))
+	ui.addRandomEntry("Dungeon", title, body)
+}
+
+func (ui *UI) generateRandomDungeonLayout() {
+	entries := []string{
+		"Entry hall with two locked iron doors; narrow corridor forks into three trapped branches.",
+		"Spiral corridor around a central chasm, with collapsing bridges and murder holes.",
+		"Grid of stone rooms linked by secret doors; one false corridor loops to a hazard chamber.",
+		"Long gallery with portcullis checkpoints, side crypts, and a flooded lower passage.",
+		"Broken fortress tunnels with barricaded junctions, dead-end ambush pockets, and sinkholes.",
+	}
+	ui.addRandomEntry("Dungeon", "Dungeon Layout", chooseOne(entries))
+}
+
+func (ui *UI) generateRandomNPC() {
+	names := []string{"Marwen Holt", "Ilyra Voss", "Bramm Tallow", "Sera Nym", "Tavik Rime", "Dorian Pike"}
+	traits := []string{"meticulous and paranoid", "charming but evasive", "idealistic and stubborn", "coldly pragmatic", "superstitious yet brave"}
+	motivations := []string{"redeem a family disgrace", "secure rare medicine", "take revenge on a rival faction", "protect a hidden heir", "recover a stolen relic"}
+	professions := []string{"quartermaster", "street physician", "cartographer", "dockmaster", "arcane scribe", "mercenary captain"}
+	body := fmt.Sprintf("Name: %s\nTrait: %s\nMotivation: %s\nProfession: %s",
+		chooseOne(names), chooseOne(traits), chooseOne(motivations), chooseOne(professions))
+	ui.addRandomEntry("NPC & World", "NPC Profile", body)
+}
+
+func (ui *UI) generateRandomPlace() {
+	taverns := []string{"The Crooked Lantern", "Salt & Stag", "Gilded Anchor", "Rusted Griffin"}
+	ships := []string{"Blackwake", "Dawn Cartographer", "Ivory Keel", "Storm Reliquary"}
+	fortresses := []string{"Bastion Khar", "Northwatch Hold", "Sunfall Redoubt", "Mourning Gate"}
+	placeType := chooseOne([]string{"Tavern", "Ship", "Fortress"})
+	name := ""
+	switch placeType {
+	case "Tavern":
+		name = chooseOne(taverns)
+	case "Ship":
+		name = chooseOne(ships)
+	default:
+		name = chooseOne(fortresses)
+	}
+	ui.addRandomEntry("NPC & World", "Place Name", fmt.Sprintf("%s: %s", placeType, name))
+}
+
+func (ui *UI) generateRandomSocialEvent() {
+	events := []string{
+		"A trade dispute escalates into a street boycott between two ethnic quarters.",
+		"A wedding alliance is publicly challenged, reopening an old blood-feud.",
+		"A festival procession is interrupted by accusations of cultural sacrilege.",
+		"Dock workers strike after a noble decree favors one community over another.",
+		"A refugee caravan arrival triggers panic, price spikes, and faction propaganda.",
+	}
+	ui.addRandomEntry("NPC & World", "Social Event & Tension", chooseOne(events))
+}
+
+func (ui *UI) generateRandomTreasureTheme() {
+	coins := []string{"74 gp, 210 sp, 120 cp", "310 gp, 45 pp", "95 gp, 900 cp, 2 trade bars"}
+	gems := []string{"3x bloodstone (50 gp each)", "1x black pearl (500 gp)", "6x agate (10 gp each)"}
+	art := []string{"gold filigree chalice", "ivory war-mask", "miniature silver astrolabe", "enameled dragon brooch"}
+	body := fmt.Sprintf("Coins: %s\nGems: %s\nArt Object: %s", chooseOne(coins), chooseOne(gems), chooseOne(art))
+	ui.addRandomEntry("Treasure & Items", "Treasure Cache", body)
+}
+
+func (ui *UI) generateRandomMagicItemTheme() {
+	rarities := []string{"Common", "Uncommon", "Rare", "Very Rare"}
+	cats := []string{"Arcana", "Armaments", "Implements", "Relics"}
+	examples := []string{
+		"wand with utility transmutation effect",
+		"weapon granting situational elemental burst",
+		"focus that improves concentration resilience",
+		"relic tied to oath-based activation",
+	}
+	body := fmt.Sprintf("Rarity: %s\nCategory: %s\nItem Theme: %s", chooseOne(rarities), chooseOne(cats), chooseOne(examples))
+	ui.addRandomEntry("Treasure & Items", "Magic Item Theme", body)
+}
+
+func (ui *UI) generateRandomCurrencyTheme() {
+	packs := []string{
+		"4 iron trade bars + 32 gp + carved amber bead",
+		"2 silver ingots + 140 sp + lacquer token set",
+		"1 electrum chain + 65 gp + 3 stamped guild scrips",
+		"mixed coin purse: 20 pp, 85 gp, 140 sp",
+	}
+	ui.addRandomEntry("Treasure & Items", "Currency Mix", chooseOne(packs))
+}
+
+func (ui *UI) generateRandomAdventureEvent() {
+	events := []string{
+		"Wilderness encounter: territorial wyvern shadow circles the convoy trail.",
+		"Chase sequence: suspect flees through market rooftops as guards block streets.",
+		"Stronghold event: sabotage in granary threatens a week-long siege defense.",
+		"Wilderness encounter: fey crossing opens during a thunderstorm at dusk.",
+		"Stronghold event: quartermaster reports forged seals on armory manifests.",
+	}
+	ui.addRandomEntry("Adventure", "Adventure Event", chooseOne(events))
+}
+
+func (ui *UI) generateRandomPlotHook() {
+	hooks := []string{
+		"Divination: 'Beneath the third bell, iron drinks moonlight.'",
+		"Hook: recover a ledger that can trigger a citywide succession crisis.",
+		"Divination: 'The heir walks masked among oathbreakers.'",
+		"Hook: escort a defector who knows siege-engine weak points.",
+		"Hook: investigate why every oracle in the district dreams the same fire.",
+	}
+	ui.addRandomEntry("Adventure", "Divination & Plot Hook", chooseOne(hooks))
+}
+
+func (ui *UI) deleteSelectedRandomEntry() {
+	if len(ui.randoms) == 0 {
+		return
+	}
+	listIdx := ui.list.GetCurrentItem()
+	if listIdx < 0 || listIdx >= len(ui.filtered) {
+		return
+	}
+	idx := ui.filtered[listIdx]
+	if idx < 0 || idx >= len(ui.randoms) {
+		return
+	}
+	removed := ui.randoms[idx].Name
+	ui.randoms = append(ui.randoms[:idx], ui.randoms[idx+1:]...)
+	ui.applyFilters()
+	if len(ui.filtered) > 0 {
+		next := min(listIdx, len(ui.filtered)-1)
+		ui.list.SetCurrentItem(next)
+		ui.renderDetailByListIndex(next)
+	} else {
+		ui.detailMeta.SetText("No random entry.")
+		ui.detailRaw.SetText("")
+		ui.rawText = ""
+	}
+	ui.status.SetText(fmt.Sprintf(" [black:gold]random[-:-] deleted %s  %s", removed, helpText))
+}
+
+func (ui *UI) clearAllRandomEntries() {
+	if len(ui.randoms) == 0 {
+		return
+	}
+	count := len(ui.randoms)
+	ui.randoms = nil
+	ui.applyFilters()
+	ui.detailMeta.SetText("No random entry.")
+	ui.detailRaw.SetText("")
+	ui.rawText = ""
+	ui.status.SetText(fmt.Sprintf(" [black:gold]random[-:-] cleared %d entries  %s", count, helpText))
+}
+
+func (ui *UI) saveRandomListAs(path string) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return errors.New("empty path")
+	}
+	data := PersistedRandom{
+		Version: 1,
+		Items:   make([]PersistedRandomItem, 0, len(ui.randoms)),
+	}
+	for _, it := range ui.randoms {
+		data.Items = append(data.Items, PersistedRandomItem{
+			Name:      strings.TrimSpace(it.Name),
+			Category:  strings.TrimSpace(it.CR),
+			Generated: strings.TrimSpace(asString(it.Raw["generated"])),
+			Content:   strings.TrimSpace(asString(it.Raw["content"])),
+		})
+	}
+	out, err := yaml.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	if err := os.WriteFile(path, out, 0o644); err != nil {
+		return err
+	}
+	ui.randomPath = path
+	_ = writeLastRandomPath(path)
+	return nil
+}
+
+func (ui *UI) loadRandomList(path string) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return errors.New("empty path")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var data PersistedRandom
+	if err := yaml.Unmarshal(b, &data); err != nil {
+		return err
+	}
+	items := make([]Monster, 0, len(data.Items))
+	for i, it := range data.Items {
+		name := strings.TrimSpace(it.Name)
+		if name == "" {
+			continue
+		}
+		category := strings.TrimSpace(it.Category)
+		if category == "" {
+			category = "Random"
+		}
+		items = append(items, Monster{
+			ID:          i + 1,
+			Name:        name,
+			CR:          category,
+			Environment: []string{category},
+			Source:      "random",
+			Type:        "generated",
+			Raw: map[string]any{
+				"name":      name,
+				"category":  category,
+				"generated": strings.TrimSpace(it.Generated),
+				"content":   strings.TrimSpace(it.Content),
+			},
+		})
+	}
+	ui.randoms = items
+	ui.randomPath = path
+	_ = writeLastRandomPath(path)
+	ui.applyFilters()
+	if len(ui.filtered) > 0 {
+		ui.list.SetCurrentItem(0)
+		ui.renderDetailByListIndex(0)
+	} else {
+		ui.detailMeta.SetText("No random entry.")
+		ui.detailRaw.SetText("")
+		ui.rawText = ""
+	}
+	return nil
+}
+
+func (ui *UI) openRandomSaveAsInput() {
+	input := tview.NewInputField().
+		SetLabel("Random file ").
+		SetFieldWidth(56)
+	input.SetLabelColor(tcell.ColorGold)
+	input.SetFieldBackgroundColor(tcell.ColorWhite)
+	input.SetFieldTextColor(tcell.ColorBlack)
+	input.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	input.SetTitle(" Save Random List As ")
+	input.SetBorder(true)
+	input.SetTitleColor(tcell.ColorGold)
+	input.SetBorderColor(tcell.ColorGold)
+	input.SetText(ui.randomPath)
+
+	closeModal := func() {
+		ui.pages.RemovePage("random-save")
+		ui.app.SetFocus(ui.list)
+	}
+	input.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEscape:
+			closeModal()
+		case tcell.KeyEnter:
+			path := strings.TrimSpace(input.GetText())
+			if path == "" {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
+				return
+			}
+			if err := ui.saveRandomListAs(path); err != nil {
+				ui.status.SetText(fmt.Sprintf(" [white:red] save error random list[-:-] %v  %s", err, helpText))
+				return
+			}
+			ui.status.SetText(fmt.Sprintf(" [black:gold]random[-:-] saved %s  %s", ui.randomPath, helpText))
+			closeModal()
+		}
+	})
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(input, 3, 0, true).
+			AddItem(nil, 0, 1, false), 72, 0, true).
+		AddItem(nil, 0, 1, false)
+	ui.pages.AddPage("random-save", modal, true, true)
+	ui.app.SetFocus(input)
+}
+
+func (ui *UI) openRandomLoadInput() {
+	input := tview.NewInputField().
+		SetLabel("Random file ").
+		SetFieldWidth(56)
+	input.SetLabelColor(tcell.ColorGold)
+	input.SetFieldBackgroundColor(tcell.ColorWhite)
+	input.SetFieldTextColor(tcell.ColorBlack)
+	input.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	input.SetTitle(" Load Random List ")
+	input.SetBorder(true)
+	input.SetTitleColor(tcell.ColorGold)
+	input.SetBorderColor(tcell.ColorGold)
+	input.SetText(ui.randomPath)
+
+	closeModal := func() {
+		ui.pages.RemovePage("random-load")
+		ui.app.SetFocus(ui.list)
+	}
+	input.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEscape:
+			closeModal()
+		case tcell.KeyEnter:
+			path := strings.TrimSpace(input.GetText())
+			if path == "" {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
+				return
+			}
+			if err := ui.loadRandomList(path); err != nil {
+				ui.status.SetText(fmt.Sprintf(" [white:red] loading error random list[-:-] %v  %s", err, helpText))
+				return
+			}
+			ui.status.SetText(fmt.Sprintf(" [black:gold]random[-:-] loaded %s  %s", ui.randomPath, helpText))
+			closeModal()
+		}
+	})
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(input, 3, 0, true).
+			AddItem(nil, 0, 1, false), 72, 0, true).
+		AddItem(nil, 0, 1, false)
+	ui.pages.AddPage("random-load", modal, true, true)
+	ui.app.SetFocus(input)
 }
 
 func (ui *UI) renderDetailByCustomEntry(entry EncounterEntry) {
@@ -9272,6 +9814,8 @@ func modeToKey(mode BrowseMode) string {
 		return "books"
 	case BrowseAdventures:
 		return "adventures"
+	case BrowseRandom:
+		return "random"
 	default:
 		return "monsters"
 	}
@@ -9293,6 +9837,8 @@ func modeFromKey(s string) BrowseMode {
 		return BrowseBooks
 	case "adventures":
 		return BrowseAdventures
+	case "random":
+		return BrowseRandom
 	default:
 		return BrowseMonsters
 	}
@@ -9318,6 +9864,7 @@ func (ui *UI) loadFilterStates() error {
 	ui.modeFilters[BrowseFeats] = data.Feats
 	ui.modeFilters[BrowseBooks] = data.Books
 	ui.modeFilters[BrowseAdventures] = data.Advs
+	ui.modeFilters[BrowseRandom] = data.Random
 	ui.browseMode = modeFromKey(data.Active)
 	return nil
 }
@@ -9335,6 +9882,7 @@ func (ui *UI) saveFilterStates() error {
 		Feats:    ui.modeFilters[BrowseFeats],
 		Books:    ui.modeFilters[BrowseBooks],
 		Advs:     ui.modeFilters[BrowseAdventures],
+		Random:   ui.modeFilters[BrowseRandom],
 	}
 	out, err := yaml.Marshal(data)
 	if err != nil {
@@ -9364,6 +9912,8 @@ func defaultEncountersPath() string  { return filepath.Join(lazy5eAppDir(), defa
 func lastEncountersPathFile() string { return filepath.Join(lazy5eAppDir(), lastEncountersFile) }
 func defaultDicePath() string        { return filepath.Join(lazy5eAppDir(), defaultDiceFile) }
 func lastDicePathFile() string       { return filepath.Join(lazy5eAppDir(), lastDiceFile) }
+func defaultRandomPath() string      { return filepath.Join(lazy5eAppDir(), defaultRandomFile) }
+func lastRandomPathFile() string     { return filepath.Join(lazy5eAppDir(), lastRandomFile) }
 func defaultBuildPath() string       { return filepath.Join(lazy5eAppDir(), defaultBuildFile) }
 func lastBuildPathFile() string      { return filepath.Join(lazy5eAppDir(), lastBuildFile) }
 func filtersStatePath() string       { return filepath.Join(lazy5eAppDir(), filtersStateFile) }
@@ -9414,6 +9964,33 @@ func writeLastDicePath(path string) error {
 		return nil
 	}
 	filePath := lastDicePathFile()
+	dir := filepath.Dir(filePath)
+	if dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(filePath, []byte(p+"\n"), 0o644)
+}
+
+func readLastRandomPath() string {
+	b, err := os.ReadFile(lastRandomPathFile())
+	if err != nil {
+		return defaultRandomPath()
+	}
+	p := strings.TrimSpace(string(b))
+	if p == "" {
+		return defaultRandomPath()
+	}
+	return p
+}
+
+func writeLastRandomPath(path string) error {
+	p := strings.TrimSpace(path)
+	if p == "" {
+		return nil
+	}
+	filePath := lastRandomPathFile()
 	dir := filepath.Dir(filePath)
 	if dir != "." && dir != "" {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -11852,6 +12429,7 @@ var (
 	finalResultRe = regexp.MustCompile(`[-+]?\d+`)
 	ppLineRe      = regexp.MustCompile(`(?mi)^\s*\[?[^\n]*passive perception[^\n]*:\s*([0-9]+)\s*$`)
 	thpLineRe     = regexp.MustCompile(`(?mi)^\s*\[?[^\n]*temp hp[^\n]*:\s*([0-9]+)\s*$`)
+	numSuffixRe   = regexp.MustCompile(`\s+#\d+$`)
 )
 
 func extractPassivePerceptionFromMonster(raw map[string]any) (int, bool) {
