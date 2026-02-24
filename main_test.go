@@ -1065,6 +1065,46 @@ func TestEncounterTempHPRemovedFromRowWhenZero(t *testing.T) {
 	}
 }
 
+func TestEncounterSkillBonusMonsterAndFallback(t *testing.T) {
+	ui := makeTestUI(t, []Monster{
+		{
+			ID:   1,
+			Name: "Scout",
+			Raw: map[string]any{
+				"dex":   14,
+				"skill": map[string]any{"stealth": "+6"},
+			},
+		},
+	})
+	entry := EncounterEntry{MonsterIndex: 0}
+	if got, ok := ui.encounterSkillBonus(entry, "Stealth"); !ok || got != 6 {
+		t.Fatalf("expected explicit stealth +6, got %d ok=%v", got, ok)
+	}
+	if got, ok := ui.encounterSkillBonus(entry, "Acrobatics"); !ok || got != 2 {
+		t.Fatalf("expected dex fallback +2 for acrobatics, got %d ok=%v", got, ok)
+	}
+}
+
+func TestEncounterSkillBonusCustomFromBuildAndPerceptionFallback(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "A", 10, 10, "1d1")})
+	entry := EncounterEntry{
+		Custom:           true,
+		CustomPassive:    14,
+		HasCustomPassive: true,
+		Character: &CharacterBuild{
+			BaseScores: []int{10, 16, 10, 12, 14, 8},
+		},
+	}
+	if got, ok := ui.encounterSkillBonus(entry, "Stealth"); !ok || got != 3 {
+		t.Fatalf("expected build dex mod +3 for stealth, got %d ok=%v", got, ok)
+	}
+	// Perception fallback from passive perception when explicit source is missing.
+	entry.Character = nil
+	if got, ok := ui.encounterSkillBonus(entry, "Perception"); !ok || got != 4 {
+		t.Fatalf("expected passive fallback +4 for perception, got %d ok=%v", got, ok)
+	}
+}
+
 func TestEncounterConditionsBadgeAndRoundProgress(t *testing.T) {
 	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
 	ui.encounterItems = []EncounterEntry{

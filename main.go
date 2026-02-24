@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
+	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] K[-:-] skill check  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
 	defaultAppDirName     = ".lazy5e"
 	defaultEncountersFile = "encounters.yaml"
 	lastEncountersFile    = ".encounters_last_path"
@@ -280,6 +280,11 @@ type encounterConditionDef struct {
 	Name string
 }
 
+type skillDef struct {
+	Name    string
+	Ability string
+}
+
 type encounterXPThreshold struct {
 	Easy   int
 	Medium int
@@ -315,6 +320,27 @@ var encounterConditionDefs = []encounterConditionDef{
 	{Code: "R", Name: "Restrained"},
 	{Code: "S", Name: "Stunned"},
 	{Code: "U", Name: "Unconscious"},
+}
+
+var skillDefs = []skillDef{
+	{Name: "Acrobatics", Ability: "dex"},
+	{Name: "Animal Handling", Ability: "wis"},
+	{Name: "Arcana", Ability: "int"},
+	{Name: "Athletics", Ability: "str"},
+	{Name: "Deception", Ability: "cha"},
+	{Name: "History", Ability: "int"},
+	{Name: "Insight", Ability: "wis"},
+	{Name: "Intimidation", Ability: "cha"},
+	{Name: "Investigation", Ability: "int"},
+	{Name: "Medicine", Ability: "wis"},
+	{Name: "Nature", Ability: "int"},
+	{Name: "Perception", Ability: "wis"},
+	{Name: "Performance", Ability: "cha"},
+	{Name: "Persuasion", Ability: "cha"},
+	{Name: "Religion", Ability: "int"},
+	{Name: "Sleight of Hand", Ability: "dex"},
+	{Name: "Stealth", Ability: "dex"},
+	{Name: "Survival", Ability: "wis"},
 }
 
 var encounterXPThresholdByLevel = map[int]encounterXPThreshold{
@@ -497,6 +523,7 @@ type UI struct {
 	activeBottomPanel    string
 	itemTreasureVisible  bool
 	spellTreasureVisible bool
+	skillCheckVisible    bool
 }
 
 func main() {
@@ -939,6 +966,10 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			// While modal is open, do not process global shortcuts (1/2/3/q/...).
 			return event
 		}
+		if ui.skillCheckVisible {
+			// While skill check modal is open, do not process global shortcuts (1/2/3/...).
+			return event
+		}
 
 		switch {
 		case event.Key() == tcell.KeyRune && event.Rune() == '?':
@@ -1225,6 +1256,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'I':
 			ui.rollAllEncounterInitiative()
 			return nil
+		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'K':
+			ui.openEncounterSkillCheckModal()
+			return nil
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'S':
 			ui.sortEncounterByInitiative()
 			return nil
@@ -1463,6 +1497,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  l : load encounter from file (load)\n" +
 			"  i : roll initiative for selected entry\n" +
 			"  I : roll initiative for all entries\n" +
+			"  K : roll a skill check (editable bonus)\n" +
 			"  S : sort entries by initiative roll\n" +
 			"  * : toggle turn mode\n" +
 			"  n / p : next / previous turn\n" +
@@ -11251,6 +11286,264 @@ func (ui *UI) encounterInitBase(entry EncounterEntry) (int, bool) {
 		return 0, false
 	}
 	return extractInitFromDex(ui.monsters[entry.MonsterIndex].Raw)
+}
+
+func abilityForSkill(skill string) string {
+	for _, d := range skillDefs {
+		if strings.EqualFold(d.Name, strings.TrimSpace(skill)) {
+			return d.Ability
+		}
+	}
+	return ""
+}
+
+func skillBonusFromMonster(raw map[string]any, skill string) (int, bool) {
+	if raw == nil {
+		return 0, false
+	}
+	if skills, ok := raw["skill"].(map[string]any); ok {
+		for k, v := range skills {
+			if strings.EqualFold(strings.TrimSpace(k), strings.TrimSpace(skill)) {
+				if n, ok := signedIntFromAny(v); ok {
+					return n, true
+				}
+			}
+		}
+	}
+	if skills, ok := raw["skill"].(map[any]any); ok {
+		for k, v := range skills {
+			if strings.EqualFold(strings.TrimSpace(asString(k)), strings.TrimSpace(skill)) {
+				if n, ok := signedIntFromAny(v); ok {
+					return n, true
+				}
+			}
+		}
+	}
+	ability := abilityForSkill(skill)
+	if ability == "" {
+		return 0, false
+	}
+	if score, ok := anyToInt(raw[ability]); ok {
+		return abilityMod(score), true
+	}
+	return 0, false
+}
+
+func skillBonusFromCharacterBuild(build *CharacterBuild, skill string) (int, bool) {
+	if build == nil || len(build.BaseScores) < 6 {
+		return 0, false
+	}
+	ability := abilityForSkill(skill)
+	if ability == "" {
+		return 0, false
+	}
+	idx := map[string]int{"str": 0, "dex": 1, "con": 2, "int": 3, "wis": 4, "cha": 5}[ability]
+	if idx < 0 || idx >= len(build.BaseScores) {
+		return 0, false
+	}
+	return abilityMod(build.BaseScores[idx]), true
+}
+
+func parseNamedSkillBonusFromText(text string, skill string) (int, bool) {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" || strings.TrimSpace(skill) == "" {
+		return 0, false
+	}
+	pattern := `(?mi)^\s*` + regexp.QuoteMeta(skill) + `\s*[: ]+\s*([+-]?\d+)\s*$`
+	re := regexp.MustCompile(pattern)
+	m := re.FindStringSubmatch(trimmed)
+	if len(m) < 2 {
+		return 0, false
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(m[1]))
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func (ui *UI) encounterSkillBonus(entry EncounterEntry, skill string) (int, bool) {
+	if entry.Custom {
+		if v, ok := skillBonusFromCharacterBuild(entry.Character, skill); ok {
+			return v, true
+		}
+		if strings.EqualFold(strings.TrimSpace(skill), "Perception") && entry.HasCustomPassive {
+			return max(0, entry.CustomPassive) - 10, true
+		}
+		if v, ok := parseNamedSkillBonusFromText(entry.CustomMeta, skill); ok {
+			return v, true
+		}
+		if v, ok := parseNamedSkillBonusFromText(entry.CustomBody, skill); ok {
+			return v, true
+		}
+		return 0, false
+	}
+	if entry.MonsterIndex < 0 || entry.MonsterIndex >= len(ui.monsters) {
+		return 0, false
+	}
+	return skillBonusFromMonster(ui.monsters[entry.MonsterIndex].Raw, skill)
+}
+
+func (ui *UI) openEncounterSkillCheckModal() {
+	if len(ui.encounterItems) == 0 {
+		return
+	}
+	index := ui.encounter.GetCurrentItem()
+	if index < 0 || index >= len(ui.encounterItems) {
+		return
+	}
+	entry := ui.encounterItems[index]
+
+	skillNames := make([]string, 0, len(skillDefs))
+	for _, d := range skillDefs {
+		skillNames = append(skillNames, d.Name)
+	}
+
+	skillDrop := tview.NewDropDown().SetLabel("Skill: ")
+	skillDrop.SetOptions(skillNames, nil)
+	skillDrop.SetCurrentOption(0)
+	skillDrop.SetLabelColor(tcell.ColorGold)
+	skillDrop.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
+	skillDrop.SetFieldTextColor(tcell.ColorWhite)
+	skillDrop.SetListStyles(
+		tcell.StyleDefault.Background(tcell.ColorDarkSlateGray).Foreground(tcell.ColorWhite),
+		tcell.StyleDefault.Background(tcell.ColorGold).Foreground(tcell.ColorBlack),
+	)
+
+	bonusField := tview.NewInputField().SetLabel("Bonus: ").SetFieldWidth(8)
+	bonusField.SetLabelColor(tcell.ColorGold)
+	bonusField.SetFieldBackgroundColor(tcell.ColorWhite)
+	bonusField.SetFieldTextColor(tcell.ColorBlack)
+	bonusField.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+
+	fillBonus := func(skill string) {
+		if b, ok := ui.encounterSkillBonus(entry, skill); ok {
+			bonusField.SetText(strconv.Itoa(b))
+			return
+		}
+		bonusField.SetText("")
+	}
+	fillBonus(skillNames[0])
+	skillDrop.SetSelectedFunc(func(text string, _ int) {
+		fillBonus(text)
+	})
+
+	form := tview.NewForm()
+	form.SetBorder(true)
+	form.SetTitle(" Skill Check ")
+	form.SetBorderColor(tcell.ColorGold)
+	form.SetTitleColor(tcell.ColorGold)
+	form.SetButtonsAlign(tview.AlignCenter)
+	form.SetButtonBackgroundColor(tcell.ColorGold)
+	form.SetButtonTextColor(tcell.ColorBlack)
+	form.SetBackgroundColor(tcell.ColorBlack)
+	form.AddFormItem(skillDrop)
+	form.AddFormItem(bonusField)
+
+	closeModal := func() {
+		ui.pages.RemovePage("encounter-skill-check")
+		ui.skillCheckVisible = false
+		ui.app.SetFocus(ui.encounter)
+	}
+	rollNow := func() {
+		_, skill := skillDrop.GetCurrentOption()
+		bonusText := strings.TrimSpace(bonusField.GetText())
+		if bonusText == "" {
+			bonusText = "0"
+		}
+		bonus, err := strconv.Atoi(bonusText)
+		if err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid skill bonus[-:-] \"%s\"  %s", bonusText, helpText))
+			return
+		}
+		roll := rand.Intn(20) + 1
+		total := roll + bonus
+		sign := "+"
+		if bonus < 0 {
+			sign = ""
+		}
+		ui.status.SetText(fmt.Sprintf(" [black:gold] skill[-:-] %s %s d20(%d) %s%d = %d  %s",
+			ui.encounterEntryDisplay(entry), skill, roll, sign, bonus, total, helpText))
+		closeModal()
+	}
+
+	form.AddButton("Roll", rollNow)
+	form.AddButton("Cancel", closeModal)
+	form.SetCancelFunc(closeModal)
+
+	skillDrop.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEnter, tcell.KeyTab:
+			form.SetFocus(1)
+		case tcell.KeyEscape:
+			closeModal()
+		}
+	})
+	skillDrop.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyTab:
+			form.SetFocus(1)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(3)
+			return nil
+		case tcell.KeyEnter:
+			if !skillDrop.IsOpen() {
+				form.SetFocus(1)
+				return nil
+			}
+			return event
+		case tcell.KeyEscape:
+			if skillDrop.IsOpen() {
+				return event
+			}
+			closeModal()
+			return nil
+		default:
+			return event
+		}
+	})
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && event.Rune() == 'q') {
+			closeModal()
+			return nil
+		}
+		return event
+	})
+	bonusField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEnter:
+			rollNow()
+			return nil
+		case tcell.KeyTab:
+			form.SetFocus(2)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(0)
+			return nil
+		case tcell.KeyEscape:
+			closeModal()
+			return nil
+		default:
+			if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+				closeModal()
+				return nil
+			}
+			return event
+		}
+	})
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(form, 10, 0, true).
+			AddItem(nil, 0, 1, false), 56, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	ui.pages.AddPage("encounter-skill-check", modal, true, true)
+	ui.skillCheckVisible = true
+	ui.app.SetFocus(form)
 }
 
 func (ui *UI) encounterMaxHP(entry EncounterEntry) int {
