@@ -1601,12 +1601,12 @@ func TestHelpForFocusIncludesPanelShortcuts(t *testing.T) {
 
 	encHelp := ui.helpForFocus(ui.encounter)
 	for _, expected := range []string{
-		"i : tira iniziativa entry selezionata",
-		"I : tira iniziativa per tutte le entry",
-		"S : ordina entry per tiro iniziativa",
-		"D : elimina tutte le entry mostro (mantiene custom/personaggi)",
-		"* : attiva/disattiva turn mode",
-		"n / p : turno successivo / precedente",
+		"i : roll initiative for selected entry",
+		"I : roll initiative for all entries",
+		"S : sort entries by initiative roll",
+		"D : delete all monster entries (keep custom/characters)",
+		"* : toggle turn mode",
+		"n / p : next / previous turn",
 	} {
 		if !strings.Contains(encHelp, expected) {
 			t.Fatalf("encounters help missing %q:\n%s", expected, encHelp)
@@ -1618,15 +1618,15 @@ func TestHelpForFocusIncludesPanelShortcuts(t *testing.T) {
 		ui.browseMode = BrowseMonsters
 	}
 	monHelp = ui.helpForFocus(ui.list)
-	if !strings.Contains(monHelp, "a : aggiungi mostro a Encounters") {
+	if !strings.Contains(monHelp, "a : add monster to Encounters") {
 		t.Fatalf("monsters help missing add shortcut:\n%s", monHelp)
 	}
-	if !strings.Contains(monHelp, "/ : cerca nella Description del mostro selezionato") {
+	if !strings.Contains(monHelp, "/ : search in selected monster Description") {
 		t.Fatalf("monsters help missing raw search shortcut:\n%s", monHelp)
 	}
 
 	rawHelp := ui.helpForFocus(ui.detailRaw)
-	if !strings.Contains(rawHelp, "/ : cerca testo nella Description corrente") {
+	if !strings.Contains(rawHelp, "/ : search text in current Description") {
 		t.Fatalf("raw help missing raw find shortcut:\n%s", rawHelp)
 	}
 }

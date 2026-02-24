@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	helpTextBase          = " [black:gold] q [-:-] esci  [black:gold] / [-:-] cerca (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] pannelli  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] browse diretto  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] naviga  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] spazio [-:-] avg/formula HP  [black:gold] ←/→ [-:-] danno/cura encounter  [black:gold] PgUp/PgDn [-:-] scroll Description "
+	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
 	defaultAppDirName     = ".lazy5e"
 	defaultEncountersFile = "encounters.yaml"
 	lastEncountersFile    = ".encounters_last_path"
@@ -538,42 +538,42 @@ func main() {
 	if yamlPath != "" {
 		monsters, envs, crs, types, err = loadMonstersFromPath(yamlPath)
 		if err != nil {
-			log.Fatalf("errore caricamento YAML esterno (%s): %v", yamlPath, err)
+			log.Fatalf("loading error YAML esterno (%s): %v", yamlPath, err)
 		}
 	} else {
 		monsters, envs, crs, types, err = loadMonstersFromBytes(embeddedMonstersYAML)
 		if err != nil {
-			log.Fatalf("errore caricamento YAML embedded: %v", err)
+			log.Fatalf("loading error YAML embedded: %v", err)
 		}
 	}
 
 	items, _, _, _, err = loadItemsFromBytes(embeddedItemsYAML)
 	if err != nil {
-		log.Fatalf("errore caricamento item YAML embedded: %v", err)
+		log.Fatalf("loading error item YAML embedded: %v", err)
 	}
 	spells, _, _, _, err = loadSpellsFromBytes(embeddedSpellsYAML)
 	if err != nil {
-		log.Fatalf("errore caricamento spell YAML embedded: %v", err)
+		log.Fatalf("loading error spell YAML embedded: %v", err)
 	}
 	classes, _, _, _, err = loadClassesFromBytes(embeddedClassesYAML)
 	if err != nil {
-		log.Fatalf("errore caricamento class YAML embedded: %v", err)
+		log.Fatalf("loading error class YAML embedded: %v", err)
 	}
 	races, _, _, _, err = loadRacesFromBytes(embeddedRacesYAML)
 	if err != nil {
-		log.Fatalf("errore caricamento race YAML embedded: %v", err)
+		log.Fatalf("loading error race YAML embedded: %v", err)
 	}
 	feats, _, _, _, err = loadFeatsFromBytes(embeddedFeatsYAML)
 	if err != nil {
-		log.Fatalf("errore caricamento feat YAML embedded: %v", err)
+		log.Fatalf("loading error feat YAML embedded: %v", err)
 	}
 	books, _, _, _, err = loadBooksFromBytes(embeddedBooksYAML)
 	if err != nil {
-		log.Fatalf("errore caricamento book YAML embedded: %v", err)
+		log.Fatalf("loading error book YAML embedded: %v", err)
 	}
 	advs, _, _, _, err = loadAdventuresFromBytes(embeddedAdventuresYAML)
 	if err != nil {
-		log.Fatalf("errore caricamento adventure YAML embedded: %v", err)
+		log.Fatalf("loading error adventure YAML embedded: %v", err)
 	}
 
 	ui := newUI(monsters, items, spells, classes, races, feats, books, advs, envs, crs, types, encountersPath, dicePath)
@@ -582,16 +582,16 @@ func main() {
 		log.Fatal(err)
 	}
 	if err := ui.saveEncounters(); err != nil {
-		log.Printf("errore salvataggio encounters (%s): %v", ui.encountersPath, err)
+		log.Printf("save error encounters (%s): %v", ui.encountersPath, err)
 	}
 	if err := ui.saveDiceResults(); err != nil {
-		log.Printf("errore salvataggio dice (%s): %v", ui.dicePath, err)
+		log.Printf("save error dice (%s): %v", ui.dicePath, err)
 	}
 	if err := ui.saveFilterStates(); err != nil {
-		log.Printf("errore salvataggio filtri: %v", err)
+		log.Printf("save error filters: %v", err)
 	}
 	if err := ui.saveDescriptionScrollStates(); err != nil {
-		log.Printf("errore salvataggio posizione description: %v", err)
+		log.Printf("save error posizione description: %v", err)
 	}
 }
 
@@ -762,7 +762,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	ui.encounter.SetSelectedFunc(func(index int, _, _ string, _ rune) {
 		ui.renderDetailByEncounterIndex(index)
 	})
-	ui.encounter.AddItem("Nessun mostro nell'encounter", "", 0, nil)
+	ui.encounter.AddItem("No monster in encounter", "", 0, nil)
 
 	ui.dice = tview.NewList()
 	ui.dice.SetBorder(true)
@@ -802,7 +802,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	ui.detailTreasure.SetBorderColor(tcell.ColorGold)
 	ui.detailTreasure.SetTextColor(tcell.ColorWhite)
 	ui.detailTreasure.SetWrap(true)
-	ui.treasureText = "Nessun tesoro generato."
+	ui.treasureText = "No treasure generated."
 	ui.detailTreasure.SetText(ui.treasureText)
 
 	ui.detailRaw = tview.NewTextView().
@@ -895,7 +895,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	ui.modeFilters[BrowseBooks] = PersistedFilterMode{}
 	ui.modeFilters[BrowseAdventures] = PersistedFilterMode{}
 	if err := ui.loadFilterStates(); err != nil {
-		ui.status.SetText(fmt.Sprintf(" [white:red] errore load filtri[-:-] %v  %s", err, helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] loading error filters[-:-] %v  %s", err, helpText))
 	}
 	_ = ui.loadDescriptionScrollStates()
 	ui.applyModeFilters(ui.browseMode)
@@ -1307,10 +1307,10 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 
 	ui.applyFilters()
 	if err := ui.loadEncounters(); err != nil {
-		ui.status.SetText(fmt.Sprintf(" [white:red] errore load encounters[-:-] %v  %s", err, helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] loading error encounters[-:-] %v  %s", err, helpText))
 	}
 	if err := ui.loadDiceResults(); err != nil {
-		ui.status.SetText(fmt.Sprintf(" [white:red] errore load dice[-:-] %v  %s", err, helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] loading error dice[-:-] %v  %s", err, helpText))
 	}
 	ui.renderEncounterList()
 	return ui
@@ -1331,7 +1331,7 @@ func (ui *UI) openHelpOverlay(focus tview.Primitive) {
 	text.SetTitle(fmt.Sprintf(" Help - %s ", ui.panelNameForFocus(focus)))
 	text.SetText(ui.helpForFocus(focus))
 
-	helpBody := ui.helpForFocus(focus) + "\n[gray]Scroll: j/k, frecce, PgUp/PgDn[-]"
+	helpBody := ui.helpForFocus(focus) + "\n[gray]Scroll: j/k, arrows, PgUp/PgDn[-]"
 	text.SetText(helpBody)
 
 	// Bigger modal so panel-specific shortcuts are not clipped on common terminal sizes.
@@ -1401,13 +1401,13 @@ func (ui *UI) panelNameForFocus(focus tview.Primitive) string {
 
 func (ui *UI) helpForFocus(focus tview.Primitive) string {
 	header := "[black:gold]Global[-:-]\n" +
-		"  ? : apri/chiudi questo help\n" +
-		"  Esc : chiudi help\n" +
-		"  q : esci programma\n" +
-		"  f : fullscreen on/off pannello corrente\n" +
-		"  Tab / Shift+Tab : cambia focus\n" +
-		"  0 / 1 / 2 / 3 : vai a Dice / Encounters / Catalogo / Description\n" +
-		"  [ / ] : browse precedente/successivo\n" +
+		"  ? : open/close this help\n" +
+		"  Esc : close help\n" +
+		"  q : quit app\n" +
+		"  f : fullscreen on/off current panel\n" +
+		"  Tab / Shift+Tab : change focus\n" +
+		"  0 / 1 / 2 / 3 : go to Dice / Encounters / Catalog / Description\n" +
+		"  [ / ] : previous/next browse panel\n" +
 		"  4 / 5 / 6 / 7 / 8 / 9 : Monsters / Items / Spells / Characters / Races / Feats\n" +
 		"  b / v : Manuals / Adventures\n\n"
 
@@ -1415,20 +1415,20 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 	case ui.dice:
 		return header +
 			"[black:gold]Dice[-:-]\n" +
-			"  a : tira espressione dadi (es. 2d6+d20+1)\n" +
-			"  Enter : rilancia riga selezionata\n" +
-			"  A : rilancia tutte le righe della history\n" +
-			"  e : modifica + rilancia riga selezionata\n" +
-			"  d : elimina riga selezionata\n" +
-			"  c : cancella tutte le righe\n" +
-			"  s : salva risultati dadi (save as)\n" +
-			"  l : carica risultati dadi (load)\n" +
-			"  f : fullscreen on/off del pannello Dice\n" +
+			"  a : roll dice expression (e.g. 2d6+d20+1)\n" +
+			"  Enter : re-roll selected row\n" +
+			"  A : re-roll all rows in history\n" +
+			"  e : edit + re-roll selected row\n" +
+			"  d : delete selected row\n" +
+			"  c : clear all rows\n" +
+			"  s : save dice results (save as)\n" +
+			"  l : load dice results (load)\n" +
+			"  f : fullscreen on/off Dice panel\n" +
 			"\n" +
-			"[black:gold]Esempi[-:-]\n" +
+			"[black:gold]Examples[-:-]\n" +
 			"  2d6+d20+1\n" +
-			"  d20v+5   (v = scegli il tiro piu alto su 2)\n" +
-			"  d20s+1   (s = scegli il tiro piu basso su 2)\n" +
+			"  d20v+5   (v = keep higher of 2 rolls)\n" +
+			"  d20s+1   (s = keep lower of 2 rolls)\n" +
 			"  d2,d3,d4\n" +
 			"  4d10+6d6+5\n" +
 			"  1d6 x2\n" +
@@ -1439,141 +1439,141 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 	case ui.encounter:
 		return header +
 			"[black:gold]Encounters[-:-]\n" +
-			"  j / k (o frecce) : seleziona entry\n" +
-			"  / : cerca nella Description del mostro selezionato\n" +
-			"  a : aggiungi entry custom\n" +
-			"  e : modifica personaggio custom (nome + level-up/multiclass)\n" +
-			"  g : genera incontro da PNG (preview/edit prima di applicare)\n" +
+			"  j / k (or arrows) : select entry\n" +
+			"  / : search in selected monster Description\n" +
+			"  a : add custom entry\n" +
+			"  e : edit custom character (name + level-up/multiclass)\n" +
+			"  g : generate encounter from PCs (preview/edit before apply)\n" +
 			"      Enter flow: Name -> Class -> Add Levels -> Apply\n" +
-			"  w / o : salva/carica build personaggio su file separato\n" +
-			"  d : elimina entry selezionata\n" +
-			"  D : elimina tutte le entry mostro (mantiene custom/personaggi)\n" +
-			"  s : salva encounter su file (save as)\n" +
-			"  l : carica encounter da file (load)\n" +
-			"  i : tira iniziativa entry selezionata\n" +
-			"  I : tira iniziativa per tutte le entry\n" +
-			"  S : ordina entry per tiro iniziativa\n" +
-			"  * : attiva/disattiva turn mode\n" +
-			"  n / p : turno successivo / precedente\n" +
-			"  u : undo ultima operazione encounter\n" +
-			"  r : redo operazione encounter annullata\n" +
-			"  c : aggiungi/togli condizioni (multi select)\n" +
-			"  x : rimuovi una sola condizione dall'entry\n" +
-			"  C : rimuovi tutte le condizioni dall'entry\n" +
-			"  [ / ] : diminuisci/aumenta round condizioni\n" +
-			"  spazio : switch HP average/formula (roll)\n" +
-			"  freccia sinistra : sottrai HP\n" +
-			"  freccia destra : aggiungi HP\n"
+			"  w / o : save/load character build from separate file\n" +
+			"  d : delete selected entry\n" +
+			"  D : delete all monster entries (keep custom/characters)\n" +
+			"  s : save encounter to file (save as)\n" +
+			"  l : load encounter from file (load)\n" +
+			"  i : roll initiative for selected entry\n" +
+			"  I : roll initiative for all entries\n" +
+			"  S : sort entries by initiative roll\n" +
+			"  * : toggle turn mode\n" +
+			"  n / p : next / previous turn\n" +
+			"  u : undo last encounter operation\n" +
+			"  r : redo undone encounter operation\n" +
+			"  c : add/remove conditions (multi select)\n" +
+			"  x : remove one condition from entry\n" +
+			"  C : clear all conditions from entry\n" +
+			"  [ / ] : decrease/increase condition rounds\n" +
+			"  space : switch HP average/formula (roll)\n" +
+			"  left arrow : subtract HP\n" +
+			"  right arrow : add HP\n"
 	case ui.list:
 		if ui.browseMode == BrowseMonsters {
 			return header +
 				"[black:gold]Monsters[-:-]\n" +
-				"  j / k (o frecce) : naviga mostri\n" +
-				"  / : cerca nella Description del mostro selezionato\n" +
-				"  a : aggiungi mostro a Encounters\n" +
-				"  m : genera tesoro da CR (regole 5e)\n" +
-				"  l : genera lair treasure da CR (regole 5e)\n" +
-				"  x : pulisci tutti i filtri\n" +
-				"  freccia sinistra/destra : scala CR del mostro (-/+) con benchmark 5e\n" +
-				"  n / e / s / c / t : focus su Name / Env / Source(multi) / CR / Type\n" +
-				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
-				"  PgUp / PgDn : scroll del pannello Description\n"
+				"  j / k (or arrows) : navigate monsters\n" +
+				"  / : search in selected monster Description\n" +
+				"  a : add monster to Encounters\n" +
+				"  m : generate treasure from CR (5e rules)\n" +
+				"  l : generate lair treasure from CR (5e rules)\n" +
+				"  x : clear all filters\n" +
+				"  left/right arrow : scale monster CR (-/+) using 5e benchmark\n" +
+				"  n / e / s / c / t : focus on Name / Env / Source(multi) / CR / Type\n" +
+				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats panel\n" +
+				"  PgUp / PgDn : scroll Description panel\n"
 		}
 		if ui.browseMode == BrowseItems {
 			return header +
 				"[black:gold]Items[-:-]\n" +
-				"  j / k (o frecce) : naviga lista\n" +
-				"  / : cerca nella Description della voce selezionata\n" +
-				"  g : genera treasure items (tipo + quantita)\n" +
-				"  S : salva Treasure su file\n" +
-				"  x : pulisci tutti i filtri\n" +
-				"  n / s / r / t : focus su Name / Source(multi) / Rarity / Type\n" +
-				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
-				"  PgUp / PgDn : scroll del pannello Description\n"
+				"  j / k (or arrows) : navigate list\n" +
+				"  / : search in selected entry Description\n" +
+				"  g : generate item treasure (type + quantity)\n" +
+				"  S : save Treasure to file\n" +
+				"  x : clear all filters\n" +
+				"  n / s / r / t : focus on Name / Source(multi) / Rarity / Type\n" +
+				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats panel\n" +
+				"  PgUp / PgDn : scroll Description panel\n"
 		}
 		if ui.browseMode == BrowseSpells {
 			return header +
 				"[black:gold]Spells[-:-]\n" +
-				"  j / k (o frecce) : naviga lista\n" +
-				"  / : cerca nella Description della voce selezionata\n" +
-				"  g : genera spells (level + quantita)\n" +
-				"  x : pulisci tutti i filtri\n" +
-				"  n / s / l / c : focus su Name / Source(multi) / Level / School\n" +
-				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
-				"  PgUp / PgDn : scroll del pannello Description\n"
+				"  j / k (or arrows) : navigate list\n" +
+				"  / : search in selected entry Description\n" +
+				"  g : generate spells (level + quantity)\n" +
+				"  x : clear all filters\n" +
+				"  n / s / l / c : focus on Name / Source(multi) / Level / School\n" +
+				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats panel\n" +
+				"  PgUp / PgDn : scroll Description panel\n"
 		}
 		if ui.browseMode == BrowseCharacters {
 			return header +
 				"[black:gold]Characters[-:-]\n" +
-				"  j / k (o frecce) : naviga classi\n" +
-				"  / : cerca nella Description della classe selezionata\n" +
-				"  a : crea personaggio (livello + razza)\n" +
-				"  x : pulisci tutti i filtri\n" +
-				"  n / e / s / c / t : focus su Name / Primary / Source(multi) / Hit Die / Caster\n" +
-				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
-				"  PgUp / PgDn : scroll del pannello Description\n"
+				"  j / k (or arrows) : navigate classes\n" +
+				"  / : search in selected class Description\n" +
+				"  a : create character (level + race)\n" +
+				"  x : clear all filters\n" +
+				"  n / e / s / c / t : focus on Name / Primary / Source(multi) / Hit Die / Caster\n" +
+				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats panel\n" +
+				"  PgUp / PgDn : scroll Description panel\n"
 		}
 		if ui.browseMode == BrowseBooks {
 			return header +
 				"[black:gold]Manuals[-:-]\n" +
-				"  j / k (o frecce) : naviga manuali\n" +
-				"  / : cerca nella Description del manuale selezionato\n" +
-				"  x : pulisci tutti i filtri\n" +
-				"  n / e / s / c / t : focus su Name / Group / Source(multi) / Year / Author\n" +
-				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats/Manuals/Adventures\n" +
-				"  PgUp / PgDn : scroll del pannello Description\n"
+				"  j / k (or arrows) : navigate manuals\n" +
+				"  / : search in selected manual Description\n" +
+				"  x : clear all filters\n" +
+				"  n / e / s / c / t : focus on Name / Group / Source(multi) / Year / Author\n" +
+				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats/Manuals/Adventures panel\n" +
+				"  PgUp / PgDn : scroll Description panel\n"
 		}
 		if ui.browseMode == BrowseAdventures {
 			return header +
 				"[black:gold]Adventures[-:-]\n" +
-				"  j / k (o frecce) : naviga avventure\n" +
-				"  / : cerca nella Description dell'avventura selezionata\n" +
-				"  x : pulisci tutti i filtri\n" +
-				"  n / e / s / c / t : focus su Name / Group / Source(multi) / Year / Author\n" +
-				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats/Manuals/Adventures\n" +
-				"  PgUp / PgDn : scroll del pannello Description\n"
+				"  j / k (or arrows) : navigate adventures\n" +
+				"  / : search in selected adventure Description\n" +
+				"  x : clear all filters\n" +
+				"  n / e / s / c / t : focus on Name / Group / Source(multi) / Year / Author\n" +
+				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats/Manuals/Adventures panel\n" +
+				"  PgUp / PgDn : scroll Description panel\n"
 		}
 		if ui.browseMode == BrowseRaces {
 			return header +
 				"[black:gold]Races[-:-]\n" +
-				"  j / k (o frecce) : naviga razze\n" +
-				"  / : cerca nella Description della razza selezionata\n" +
-				"  x : pulisci tutti i filtri\n" +
-				"  n / e / s / c / t : focus su Name / Ability / Source(multi) / Size / Lineage\n" +
-				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
-				"  PgUp / PgDn : scroll del pannello Description\n"
+				"  j / k (or arrows) : navigate races\n" +
+				"  / : search in selected race Description\n" +
+				"  x : clear all filters\n" +
+				"  n / e / s / c / t : focus on Name / Ability / Source(multi) / Size / Lineage\n" +
+				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats panel\n" +
+				"  PgUp / PgDn : scroll Description panel\n"
 		}
 		return header +
 			"[black:gold]Feats[-:-]\n" +
-			"  j / k (o frecce) : naviga talenti\n" +
-			"  / : cerca nella Description del talento selezionato\n" +
-			"  x : pulisci tutti i filtri\n" +
-			"  n / e / s / c / t : focus su Name / Prereq / Source(multi) / Category / Ability\n" +
-			"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
-			"  PgUp / PgDn : scroll del pannello Description\n"
+			"  j / k (or arrows) : navigate feats\n" +
+			"  / : search in selected feat Description\n" +
+			"  x : clear all filters\n" +
+			"  n / e / s / c / t : focus on Name / Prereq / Source(multi) / Category / Ability\n" +
+			"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats panel\n" +
+			"  PgUp / PgDn : scroll Description panel\n"
 	case ui.detailRaw:
 		return header +
 			"[black:gold]Description[-:-]\n" +
-			"  / : cerca testo nella Description corrente\n" +
-			"  j / k (o frecce) : scroll contenuto\n"
+			"  / : search text in current Description\n" +
+			"  j / k (or arrows) : scroll content\n"
 	case ui.detailMeta, ui.detailTreasure:
 		return header +
 			"[black:gold]Details/Treasure[-:-]\n" +
-			"  d : switch focus tra Details e Treasure\n" +
-			"  j / k (o frecce) : scroll contenuto\n"
+			"  d : switch focus between Details and Treasure\n" +
+			"  j / k (or arrows) : scroll content\n"
 	case ui.nameInput:
 		return header +
 			"[black:gold]Name Filter[-:-]\n" +
-			"  scrivi testo : filtro per nome\n" +
-			"  x : pulisci tutti i filtri\n" +
-			"  Enter / Esc : torna a Monsters\n"
+			"  type text : filter by name\n" +
+			"  x : clear all filters\n" +
+			"  Enter / Esc : return to Monsters\n"
 	case ui.envDrop, ui.sourceDrop, ui.crDrop, ui.typeDrop:
 		return header +
 			"[black:gold]Filter Dropdown[-:-]\n" +
-			"  frecce / Invio : cambia valore filtro\n" +
-			"  x : pulisci tutti i filtri\n"
+			"  arrows / Enter : change filter value\n" +
+			"  x : clear all filters\n"
 	default:
-		return header + "[black:gold]Panel[-:-]\n  Nessuna scorciatoia specifica.\n"
+		return header + "[black:gold]Panel[-:-]\n  No panel-specific shortcut.\n"
 	}
 }
 
@@ -1669,11 +1669,11 @@ func (ui *UI) openTreasureByCRInput() {
 		crText := strings.TrimSpace(input.GetText())
 		outcome, err := generateIndividualTreasure(crText, rand.Intn)
 		if err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] CR non valido[-:-] \"%s\"  %s", crText, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid CR[-:-] \"%s\"  %s", crText, helpText))
 			return
 		}
 		ui.renderTreasureOutcome(crText, outcome)
-		ui.status.SetText(fmt.Sprintf(" [black:gold]tesoro[-:-] generato per CR %s  %s", crText, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold]treasure[-:-] generated for CR %s  %s", crText, helpText))
 	})
 
 	ui.pages.AddPage("treasure-input", modal, true, true)
@@ -1714,11 +1714,11 @@ func (ui *UI) openLairTreasureByCRInput() {
 		crText := strings.TrimSpace(input.GetText())
 		outcome, err := generateLairTreasure(crText, rand.Intn)
 		if err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] CR non valido[-:-] \"%s\"  %s", crText, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid CR[-:-] \"%s\"  %s", crText, helpText))
 			return
 		}
 		ui.renderTreasureOutcome(crText, outcome)
-		ui.status.SetText(fmt.Sprintf(" [black:gold]lair treasure[-:-] generato per CR %s  %s", crText, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold]lair treasure[-:-] generated for CR %s  %s", crText, helpText))
 	})
 
 	ui.pages.AddPage("lair-treasure-input", modal, true, true)
@@ -1807,7 +1807,7 @@ func (ui *UI) openItemTreasureInput() {
 	runGenerate := func() {
 		count, err := strconv.Atoi(strings.TrimSpace(qtyInput.GetText()))
 		if err != nil || count <= 0 {
-			ui.status.SetText(fmt.Sprintf(" [white:red] quantita non valida[-:-] \"%s\"  %s", qtyInput.GetText(), helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid quantity[-:-] \"%s\"  %s", qtyInput.GetText(), helpText))
 			return
 		}
 		kinds := keysSorted(selectedTypes)
@@ -1904,7 +1904,7 @@ func (ui *UI) openSpellTreasureInput() {
 	runGenerate := func() {
 		count, err := strconv.Atoi(strings.TrimSpace(qty))
 		if err != nil || count <= 0 {
-			ui.status.SetText(fmt.Sprintf(" [white:red] quantita non valida[-:-] \"%s\"  %s", qty, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid quantity[-:-] \"%s\"  %s", qty, helpText))
 			return
 		}
 		filter := SpellTreasureFilter{
@@ -1953,8 +1953,8 @@ func (ui *UI) openSpellTreasureInput() {
 
 func (ui *UI) openTreasureSaveAsInput() {
 	content := strings.TrimSpace(ui.treasureText)
-	if content == "" || strings.EqualFold(content, "Nessun tesoro generato.") {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessun Treasure da salvare[-:-]  %s", helpText))
+	if content == "" || strings.EqualFold(content, "No treasure generated.") {
+		ui.status.SetText(fmt.Sprintf(" [white:red] no Treasure to save[-:-]  %s", helpText))
 		return
 	}
 	defaultName := fmt.Sprintf("tesoro-%s.yaml", newShortUUID())
@@ -1977,10 +1977,10 @@ func (ui *UI) openTreasureSaveAsInput() {
 	}
 	trySave := func(path string, overwrite bool) {
 		if err := ui.saveTreasureToPath(path, overwrite); err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] errore save treasure[-:-] %v  %s", err, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] save error treasure[-:-] %v  %s", err, helpText))
 			return
 		}
-		ui.status.SetText(fmt.Sprintf(" [black:gold]treasure salvato[-:-] %s  %s", path, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold]treasure saved[-:-] %s  %s", path, helpText))
 		closeModal()
 	}
 
@@ -1991,13 +1991,13 @@ func (ui *UI) openTreasureSaveAsInput() {
 		}
 		path := strings.TrimSpace(input.GetText())
 		if path == "" {
-			ui.status.SetText(fmt.Sprintf(" [white:red] nome file non valido[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
 			return
 		}
 		if fileExists(path) {
 			ui.openTreasureOverwriteConfirm(path, func(confirmed bool) {
 				if !confirmed {
-					ui.status.SetText(fmt.Sprintf(" [black:gold]save treasure[-:-] annullato (file esistente)  %s", helpText))
+					ui.status.SetText(fmt.Sprintf(" [black:gold]save treasure[-:-] canceled (file exists)  %s", helpText))
 					return
 				}
 				trySave(path, true)
@@ -2095,11 +2095,11 @@ type SpellTreasureFilter struct {
 
 func (ui *UI) generateSpellTreasure(filter SpellTreasureFilter, count int) ([]Monster, error) {
 	if count < 1 {
-		return nil, errors.New("quantita deve essere >= 1")
+		return nil, errors.New("quantity must be >= 1")
 	}
 	candidates := filterSpellsByFilter(ui.spells, filter)
 	if len(candidates) == 0 {
-		return nil, fmt.Errorf("nessuna spell trovata per level=%q school=%q", filter.Level, filter.School)
+		return nil, fmt.Errorf("no spell found for level=%q school=%q", filter.Level, filter.School)
 	}
 	out := make([]Monster, 0, count)
 	for range count {
@@ -2153,11 +2153,11 @@ func (ui *UI) renderGeneratedSpellTreasure(filter SpellTreasureFilter, spells []
 
 func (ui *UI) generateItemTreasureByKinds(kinds []string, count int) ([]Monster, error) {
 	if count < 1 {
-		return nil, errors.New("quantita deve essere >= 1")
+		return nil, errors.New("quantity must be >= 1")
 	}
 	candidates := filterItemsByTreasureKinds(ui.items, kinds)
 	if len(candidates) == 0 {
-		return nil, fmt.Errorf("nessun item trovato per tipo \"%s\"", strings.Join(kinds, ","))
+		return nil, fmt.Errorf("no item found for type \"%s\"", strings.Join(kinds, ","))
 	}
 	out := make([]Monster, 0, count)
 	for range count {
@@ -2394,7 +2394,7 @@ func (ui *UI) openDiceRollInput() {
 			}
 			batchExprs, err := expandDiceRollInput(exprInput)
 			if err != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] espressione dadi non valida[-:-] %v  %s", err, helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid dice expression[-:-] %v  %s", err, helpText))
 				return
 			}
 			ui.pushDiceUndo()
@@ -2402,7 +2402,7 @@ func (ui *UI) openDiceRollInput() {
 			for _, expr := range batchExprs {
 				total, breakdown, rollErr := rollDiceExpression(expr)
 				if rollErr != nil {
-					ui.status.SetText(fmt.Sprintf(" [white:red] espressione dadi non valida[-:-] %v  %s", rollErr, helpText))
+					ui.status.SetText(fmt.Sprintf(" [white:red] invalid dice expression[-:-] %v  %s", rollErr, helpText))
 					return
 				}
 				lastTotal = total
@@ -2472,13 +2472,13 @@ func (ui *UI) openDiceReRollInput() {
 			}
 			batchExprs, err := expandDiceRollInput(exprInput)
 			if err != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] espressione dadi non valida[-:-] %v  %s", err, helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid dice expression[-:-] %v  %s", err, helpText))
 				return
 			}
 			ui.pushDiceUndo()
 			total, breakdown, rollErr := rollDiceExpression(batchExprs[0])
 			if rollErr != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] espressione dadi non valida[-:-] %v  %s", rollErr, helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid dice expression[-:-] %v  %s", rollErr, helpText))
 				return
 			}
 			ui.diceLog[index] = DiceResult{Expression: batchExprs[0], Output: breakdown}
@@ -2487,7 +2487,7 @@ func (ui *UI) openDiceReRollInput() {
 			for i := 1; i < len(batchExprs); i++ {
 				t, b, e := rollDiceExpression(batchExprs[i])
 				if e != nil {
-					ui.status.SetText(fmt.Sprintf(" [white:red] espressione dadi non valida[-:-] %v  %s", e, helpText))
+					ui.status.SetText(fmt.Sprintf(" [white:red] invalid dice expression[-:-] %v  %s", e, helpText))
 					return
 				}
 				lastTotal = t
@@ -2534,7 +2534,7 @@ func (ui *UI) rerollSelectedDiceResult() {
 	}
 	total, breakdown, err := rollDiceExpression(expr)
 	if err != nil {
-		ui.status.SetText(fmt.Sprintf(" [white:red] espressione dadi non valida[-:-] %v  %s", err, helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] invalid dice expression[-:-] %v  %s", err, helpText))
 		return
 	}
 	ui.pushDiceUndo()
@@ -2569,7 +2569,7 @@ func (ui *UI) rerollAllDiceResults() {
 		okCount++
 	}
 	ui.renderDiceList()
-	ui.status.SetText(fmt.Sprintf(" [black:gold]dice[-:-] rilanciati tutti (%d ok, %d errori)  %s", okCount, errCount, helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold]dice[-:-] all rerolled (%d ok, %d errors)  %s", okCount, errCount, helpText))
 }
 
 func (ui *UI) appendDiceLog(entry DiceResult) {
@@ -2634,7 +2634,7 @@ func (ui *UI) deleteSelectedDiceResult() {
 		index = len(ui.diceLog) - 1
 	}
 	ui.dice.SetCurrentItem(index)
-	ui.status.SetText(fmt.Sprintf(" [black:gold]dice[-:-] riga eliminata  %s", helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold]dice[-:-] row deleted  %s", helpText))
 }
 
 func (ui *UI) clearDiceResults() {
@@ -2644,7 +2644,7 @@ func (ui *UI) clearDiceResults() {
 	ui.pushDiceUndo()
 	ui.diceLog = nil
 	ui.renderDiceList()
-	ui.status.SetText(fmt.Sprintf(" [black:gold]dice[-:-] tutte le righe cancellate  %s", helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold]dice[-:-] all rows cleared  %s", helpText))
 }
 
 func (ui *UI) pushDiceUndo() {
@@ -2678,7 +2678,7 @@ func (ui *UI) restoreDiceState(state DiceUndoState) {
 
 func (ui *UI) undoDiceCommand() {
 	if len(ui.diceUndo) == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessuna operazione dice da annullare[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no dice operation to undo[-:-]  %s", helpText))
 		return
 	}
 	current := ui.captureDiceState()
@@ -2686,12 +2686,12 @@ func (ui *UI) undoDiceCommand() {
 	ui.diceUndo = ui.diceUndo[:len(ui.diceUndo)-1]
 	ui.diceRedo = append(ui.diceRedo, current)
 	ui.restoreDiceState(last)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] undo[-:-] operazione dice annullata  %s", helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold] undo[-:-] dice operation undone  %s", helpText))
 }
 
 func (ui *UI) redoDiceCommand() {
 	if len(ui.diceRedo) == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessuna operazione dice da ripristinare[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no dice operation to redo[-:-]  %s", helpText))
 		return
 	}
 	current := ui.captureDiceState()
@@ -2699,7 +2699,7 @@ func (ui *UI) redoDiceCommand() {
 	ui.diceRedo = ui.diceRedo[:len(ui.diceRedo)-1]
 	ui.diceUndo = append(ui.diceUndo, current)
 	ui.restoreDiceState(last)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] redo[-:-] operazione dice ripristinata  %s", helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold] redo[-:-] dice operation redone  %s", helpText))
 }
 
 func (ui *UI) openDiceSaveAsInput() {
@@ -2728,14 +2728,14 @@ func (ui *UI) openDiceSaveAsInput() {
 		case tcell.KeyEnter:
 			path := strings.TrimSpace(input.GetText())
 			if path == "" {
-				ui.status.SetText(fmt.Sprintf(" [white:red] nome file non valido[-:-]  %s", helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
 				return
 			}
 			if err := ui.saveDiceResultsAs(path); err != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] errore save dice[-:-] %v  %s", err, helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] save error dice[-:-] %v  %s", err, helpText))
 				return
 			}
-			ui.status.SetText(fmt.Sprintf(" [black:gold] salvato dice[-:-] %s  %s", ui.dicePath, helpText))
+			ui.status.SetText(fmt.Sprintf(" [black:gold] dice saved[-:-] %s  %s", ui.dicePath, helpText))
 			closeModal()
 		}
 	})
@@ -2778,7 +2778,7 @@ func (ui *UI) openDiceLoadInput() {
 		case tcell.KeyEnter:
 			path := strings.TrimSpace(input.GetText())
 			if path == "" {
-				ui.status.SetText(fmt.Sprintf(" [white:red] nome file non valido[-:-]  %s", helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
 				return
 			}
 			prevState := ui.captureDiceState()
@@ -2786,12 +2786,12 @@ func (ui *UI) openDiceLoadInput() {
 			ui.dicePath = path
 			if err := ui.loadDiceResults(); err != nil {
 				ui.dicePath = prev
-				ui.status.SetText(fmt.Sprintf(" [white:red] errore load dice[-:-] %v  %s", err, helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] loading error dice[-:-] %v  %s", err, helpText))
 				return
 			}
 			ui.diceUndo = append(ui.diceUndo, prevState)
 			ui.diceRedo = ui.diceRedo[:0]
-			ui.status.SetText(fmt.Sprintf(" [black:gold] caricato dice[-:-] %s  %s", ui.dicePath, helpText))
+			ui.status.SetText(fmt.Sprintf(" [black:gold] dice loaded[-:-] %s  %s", ui.dicePath, helpText))
 			closeModal()
 		}
 	})
@@ -2872,7 +2872,7 @@ func (ui *UI) toggleFullscreenForFocus(focus tview.Primitive) {
 		ui.fullscreenActive = false
 		ui.fullscreenTarget = ""
 		ui.applyBaseLayout()
-		ui.status.SetText(fmt.Sprintf(" [black:gold]fullscreen[-:-] disattivato  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold]fullscreen[-:-] disabled  %s", helpText))
 		return
 	}
 	target := ui.fullscreenTargetForFocus(focus)
@@ -3426,7 +3426,7 @@ func (ui *UI) clearCurrentBrowseFilters() {
 	ui.applyFilters()
 	ui.saveCurrentModeFilters()
 	ui.app.SetFocus(ui.list)
-	ui.status.SetText(fmt.Sprintf(" [black:gold]filtri[-:-] resettati (%s)  %s", ui.browseModeName(), helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold]filters[-:-] reset (%s)  %s", ui.browseModeName(), helpText))
 }
 
 func (ui *UI) descriptionKeyForMode(mode BrowseMode, idx int) string {
@@ -3681,10 +3681,10 @@ func (ui *UI) renderList() {
 		ui.list.AddItem(m.Name, "", 0, nil)
 	}
 
-	ui.status.SetText(fmt.Sprintf(" [black:gold] %d risultati [-:-] %s", len(ui.filtered), helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold] %d results [-:-] %s", len(ui.filtered), helpText))
 
 	if len(ui.filtered) == 0 {
-		ui.detailMeta.SetText(fmt.Sprintf("Nessun risultato in %s con i filtri correnti.", ui.browseModeName()))
+		ui.detailMeta.SetText(fmt.Sprintf("No results in %s with current filters.", ui.browseModeName()))
 		ui.detailRaw.SetText("")
 		ui.rawText = ""
 		return
@@ -5035,7 +5035,7 @@ func (ui *UI) generateCharacterSheetFromBuild(build CharacterBuild) (generatedCh
 			continue
 		}
 		if _, ok := ui.findClassByName(c.Name); !ok {
-			return generatedCharacterSheet{}, outBuild, fmt.Errorf("classe non trovata: %s", c.Name)
+			return generatedCharacterSheet{}, outBuild, fmt.Errorf("class not found: %s", c.Name)
 		}
 	}
 	if outBuild.Name == "" {
@@ -5049,12 +5049,12 @@ func (ui *UI) generateCharacterSheetFromBuild(build CharacterBuild) (generatedCh
 
 	primary, ok := ui.primaryClassFromBuild(outBuild)
 	if !ok {
-		return generatedCharacterSheet{}, outBuild, fmt.Errorf("classe principale non valida: %s", classLevelsSummary(outBuild.Classes))
+		return generatedCharacterSheet{}, outBuild, fmt.Errorf("invalid primary class: %s", classLevelsSummary(outBuild.Classes))
 	}
 	race, ok := ui.findRaceByName(outBuild.Race)
 	if !ok {
 		if len(ui.races) == 0 {
-			return generatedCharacterSheet{}, outBuild, fmt.Errorf("nessuna razza disponibile")
+			return generatedCharacterSheet{}, outBuild, fmt.Errorf("no race available")
 		}
 		race = ui.races[0]
 		outBuild.Race = race.Name
@@ -5983,7 +5983,7 @@ func (ui *UI) openRawSearch(returnFocus tview.Primitive) {
 		if !ok {
 			ui.rawQuery = query
 			ui.renderRawWithHighlight(query, -1)
-			ui.status.SetText(fmt.Sprintf(" [white:red] nessun match nella Description [-:-] \"%s\"  %s", query, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] no match in Description [-:-] \"%s\"  %s", query, helpText))
 			return
 		}
 		ui.rawQuery = query
@@ -6027,14 +6027,14 @@ func (ui *UI) openEncounterSaveAsInput() {
 		}
 		path := strings.TrimSpace(input.GetText())
 		if path == "" {
-			ui.status.SetText(fmt.Sprintf(" [white:red] nome file non valido[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
 			return
 		}
 		if err := ui.saveEncountersAs(path); err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] errore save encounters[-:-] %v  %s", err, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] save error encounters[-:-] %v  %s", err, helpText))
 			return
 		}
-		ui.status.SetText(fmt.Sprintf(" [black:gold] salvato[-:-] %s  %s", ui.encountersPath, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] saved[-:-] %s  %s", ui.encountersPath, helpText))
 	})
 
 	ui.pages.AddPage("encounter-saveas", modal, true, true)
@@ -6072,7 +6072,7 @@ func (ui *UI) openEncounterLoadInput() {
 		}
 		path := strings.TrimSpace(input.GetText())
 		if path == "" {
-			ui.status.SetText(fmt.Sprintf(" [white:red] nome file non valido[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
 			return
 		}
 
@@ -6080,7 +6080,7 @@ func (ui *UI) openEncounterLoadInput() {
 		ui.encountersPath = path
 		if err := ui.loadEncounters(); err != nil {
 			ui.encountersPath = prev
-			ui.status.SetText(fmt.Sprintf(" [white:red] errore load encounters[-:-] %v  %s", err, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] loading error encounters[-:-] %v  %s", err, helpText))
 			return
 		}
 		ui.encounterUndo = ui.encounterUndo[:0]
@@ -6097,12 +6097,12 @@ func (ui *UI) openEncounterLoadInput() {
 			ui.encounter.SetCurrentItem(idx)
 			ui.renderDetailByEncounterIndex(idx)
 		} else {
-			ui.detailMeta.SetText("Nessun mostro nell'encounter.")
+			ui.detailMeta.SetText("No monster in encounter.")
 			ui.detailRaw.SetText("")
 			ui.rawText = ""
 		}
 		_ = writeLastEncountersPath(ui.encountersPath)
-		ui.status.SetText(fmt.Sprintf(" [black:gold] caricato[-:-] %s  %s", ui.encountersPath, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] loaded[-:-] %s  %s", ui.encountersPath, helpText))
 	})
 
 	ui.pages.AddPage("encounter-load", modal, true, true)
@@ -6222,12 +6222,12 @@ func (ui *UI) openCreateCharacterFromClassForm() {
 	runGenerate = func() {
 		level, err := strconv.Atoi(strings.TrimSpace(levelField.GetText()))
 		if err != nil || level < 1 || level > 20 {
-			ui.status.SetText(fmt.Sprintf(" [white:red] livello non valido (1-20)[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid level (1-20)[-:-]  %s", helpText))
 			return
 		}
 		raceOpt, _ := raceDrop.GetCurrentOption()
 		if raceOpt < 0 || raceOpt >= len(raceIndexByOption) || raceIndexByOption[raceOpt] < 0 || raceIndexByOption[raceOpt] >= len(ui.races) {
-			ui.status.SetText(fmt.Sprintf(" [white:red] razza non valida[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid race[-:-]  %s", helpText))
 			return
 		}
 		rc := ui.races[raceIndexByOption[raceOpt]]
@@ -6242,7 +6242,7 @@ func (ui *UI) openCreateCharacterFromClassForm() {
 		}
 		sheet, build, err := ui.generateCharacterSheetFromBuild(build)
 		if err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] errore creazione personaggio[-:-] %v  %s", err, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] character creation error[-:-] %v  %s", err, helpText))
 			return
 		}
 		ui.detailMeta.SetText(sheet.Meta)
@@ -6255,7 +6255,7 @@ func (ui *UI) openCreateCharacterFromClassForm() {
 		build.Name = charName
 		ui.addGeneratedCharacterToEncounter(charName, sheet.Init, sheet.AC, sheet.HP, sheet.Meta, sheet.Body, &build)
 		closeModal()
-		ui.status.SetText(fmt.Sprintf(" [black:gold] personaggio creato[-:-] %s Lv%d (%s) + aggiunto a Encounters  %s", cl.Name, level, rc.Name, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] character created[-:-] %s Lv%d (%s) + aggiunto a Encounters  %s", cl.Name, level, rc.Name, helpText))
 	}
 	form.AddButton("Generate", runGenerate)
 	form.AddButton("Cancel", func() {
@@ -6514,7 +6514,7 @@ func monsterMatchesEnvironment(m Monster, env string) bool {
 
 func (ui *UI) chooseAutoEncounterMonsters(targetXP int, count int, env string) ([]int, string, error) {
 	if count <= 0 {
-		return nil, "", errors.New("numero mostri non valido")
+		return nil, "", errors.New("invalid monster count")
 	}
 	type candidate struct {
 		index int
@@ -6555,7 +6555,7 @@ func (ui *UI) chooseAutoEncounterMonsters(targetXP int, count int, env string) (
 		usedEnv = "All"
 	}
 	if len(cands) == 0 {
-		return nil, "", errors.New("nessun mostro con CR/XP valido trovato")
+		return nil, "", errors.New("no monster with valid CR/XP found")
 	}
 
 	limit := min(16, len(cands))
@@ -6580,21 +6580,21 @@ func (ui *UI) chooseAutoEncounterMonsters(targetXP int, count int, env string) (
 func (ui *UI) buildEncounterGenerationPreview(count int, power int, level int, env string) (encounterGenerationPreview, error) {
 	levels := ui.encounterNPCLevels()
 	if len(levels) == 0 {
-		return encounterGenerationPreview{}, errors.New("nessun PNG in Encounters: aggiungi personaggi prima della generazione")
+		return encounterGenerationPreview{}, errors.New("no PCs in Encounters: add characters before generation")
 	}
 	if count < 1 || count > 50 {
-		return encounterGenerationPreview{}, errors.New("numero mostri non valido (1-50)")
+		return encounterGenerationPreview{}, errors.New("invalid monster count (1-50)")
 	}
 	if power < -12 || power > 12 {
-		return encounterGenerationPreview{}, errors.New("potenza non valida (-12..12)")
+		return encounterGenerationPreview{}, errors.New("invalid power (-12..12)")
 	}
 	if level < 1 || level > 20 {
-		return encounterGenerationPreview{}, errors.New("livello non valido (1-20)")
+		return encounterGenerationPreview{}, errors.New("invalid level (1-20)")
 	}
 
 	budget := partyMediumXPBudget(levels, level)
 	if budget <= 0 {
-		return encounterGenerationPreview{}, errors.New("budget XP non valido")
+		return encounterGenerationPreview{}, errors.New("invalid XP budget")
 	}
 	multiplier := encounterMultiplierByCount(count, len(levels))
 	targetXP := int(math.Round(float64(budget) / (float64(count) * multiplier)))
@@ -6623,7 +6623,7 @@ func (ui *UI) buildEncounterGenerationPreview(count int, power int, level int, e
 func (ui *UI) renderEncounterGenerationPreview(p encounterGenerationPreview) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "[white]Party PNG:[-] %d   [white]Level:[-] %d   [white]Env:[-] %s\n", p.PartySize, p.PartyLevel, p.Environment)
-	fmt.Fprintf(&b, "[white]Budget XP (Medium):[-] %d   [white]Multiplier:[-] %.1f   [white]Target XP/mostro:[-] %d\n", p.BudgetXP, p.Multiplier, p.TargetXP)
+	fmt.Fprintf(&b, "[white]Budget XP (Medium):[-] %d   [white]Multiplier:[-] %.1f   [white]Target XP/monster:[-] %d\n", p.BudgetXP, p.Multiplier, p.TargetXP)
 	fmt.Fprintf(&b, "[white]Mostri:[-] %d   [white]Potenza:[-] %+d\n\n", p.Count, p.Power)
 
 	type row struct {
@@ -6646,7 +6646,7 @@ func (ui *UI) renderEncounterGenerationPreview(p encounterGenerationPreview) str
 		agg[key].n++
 	}
 	if len(order) == 0 {
-		return "[white:red]Nessun mostro generato[-:-]"
+		return "[white:red]No monster generated[-:-]"
 	}
 	sort.Strings(order)
 	for i, key := range order {
@@ -6707,7 +6707,7 @@ func (ui *UI) applyEncounterGenerationPreview(p encounterGenerationPreview) int 
 		ui.turnIndex = 0
 		ui.turnRound = 0
 		ui.renderEncounterList()
-		ui.detailMeta.SetText("Nessun mostro nell'encounter.")
+		ui.detailMeta.SetText("No monster in encounter.")
 		ui.detailRaw.SetText("")
 		ui.rawText = ""
 		return 0
@@ -6731,7 +6731,7 @@ func (ui *UI) applyEncounterGenerationPreview(p encounterGenerationPreview) int 
 func (ui *UI) openEncounterAutoGenerateForm() {
 	levels := ui.encounterNPCLevels()
 	if len(levels) == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessun PNG in Encounters: aggiungi prima personaggi[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no PCs in Encounters: add characters first[-:-]  %s", helpText))
 		return
 	}
 
@@ -6799,15 +6799,15 @@ func (ui *UI) openEncounterAutoGenerateForm() {
 	buildPreview := func() error {
 		count, err := strconv.Atoi(strings.TrimSpace(numberField.GetText()))
 		if err != nil {
-			return errors.New("numero mostri non valido")
+			return errors.New("invalid monster count")
 		}
 		power, err := strconv.Atoi(strings.TrimSpace(powerField.GetText()))
 		if err != nil {
-			return errors.New("potenza non valida")
+			return errors.New("invalid power")
 		}
 		level, err := strconv.Atoi(strings.TrimSpace(levelField.GetText()))
 		if err != nil {
-			return errors.New("livello non valido")
+			return errors.New("invalid level")
 		}
 		_, env := envDrop.GetCurrentOption()
 		prev, err := ui.buildEncounterGenerationPreview(count, power, level, env)
@@ -6823,11 +6823,11 @@ func (ui *UI) openEncounterAutoGenerateForm() {
 	runPreview := func() {
 		if err := buildPreview(); err != nil {
 			hasPreview = false
-			previewBox.SetText(fmt.Sprintf("[white:red]Errore input:[-:-] %v", err))
+			previewBox.SetText(fmt.Sprintf("[white:red]Input error:[-:-] %v", err))
 			ui.status.SetText(fmt.Sprintf(" [white:red] %v[-:-]  %s", err, helpText))
 			return
 		}
-		ui.status.SetText(fmt.Sprintf(" [black:gold] preview incontro[-:-] %d mostri (lvl %d, env %s, power %+d)  %s",
+		ui.status.SetText(fmt.Sprintf(" [black:gold] encounter preview[-:-] %d monsters (lvl %d, env %s, power %+d)  %s",
 			currentPreview.Count,
 			currentPreview.PartyLevel,
 			currentPreview.Environment,
@@ -6845,7 +6845,7 @@ func (ui *UI) openEncounterAutoGenerateForm() {
 		ui.pushEncounterUndo()
 		added := ui.applyEncounterGenerationPreview(currentPreview)
 		closeModal()
-		ui.status.SetText(fmt.Sprintf(" [black:gold] incontro generato[-:-] %d mostri aggiunti (custom/PNG mantenuti)  %s", added, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] encounter generated[-:-] %d monsters added (custom/PC kept)  %s", added, helpText))
 	}
 
 	numberField.SetDoneFunc(func(key tcell.Key) {
@@ -7041,13 +7041,13 @@ func (ui *UI) openAddCustomEncounterForm() {
 	form.AddButton("Save", func() {
 		name := strings.TrimSpace(nameField.GetText())
 		if name == "" {
-			ui.status.SetText(fmt.Sprintf(" [white:red] nome non valido[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid name[-:-]  %s", helpText))
 			return
 		}
 
 		hasRoll, initRoll, initBase, ok := parseInitInput(initField.GetText())
 		if !ok {
-			ui.status.SetText(fmt.Sprintf(" [white:red] init non valida[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid init[-:-]  %s", helpText))
 			return
 		}
 
@@ -7060,7 +7060,7 @@ func (ui *UI) openAddCustomEncounterForm() {
 		ac := strings.TrimSpace(acField.GetText())
 		if ac != "" {
 			if _, err := strconv.Atoi(ac); err != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] AC non valida[-:-]  %s", helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid AC[-:-]  %s", helpText))
 				return
 			}
 		}
@@ -7070,7 +7070,7 @@ func (ui *UI) openAddCustomEncounterForm() {
 		if passiveText != "" {
 			n, err := strconv.Atoi(passiveText)
 			if err != nil || n < 0 {
-				ui.status.SetText(fmt.Sprintf(" [white:red] Passive Perception non valida[-:-]  %s", helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid Passive Perception[-:-]  %s", helpText))
 				return
 			}
 			hasPassive = true
@@ -7159,7 +7159,7 @@ func (ui *UI) previewCharacterBuildEdit(entry EncounterEntry, next CharacterBuil
 		buildDeltaLine("Init", entry.CustomInit, sheet.Init),
 	}
 	if level > 20 {
-		lines = append(lines, "[white:red]Warning:[-:-] livello totale oltre 20")
+		lines = append(lines, "[white:red]Warning:[-:-] total level over 20")
 	}
 	return strings.Join(lines, "\n")
 }
@@ -7174,7 +7174,7 @@ func atoiDefault(s string, def int) int {
 
 func (ui *UI) applyCharacterBuildToEncounter(index int, next CharacterBuild) error {
 	if index < 0 || index >= len(ui.encounterItems) {
-		return fmt.Errorf("indice encounter non valido")
+		return fmt.Errorf("invalid encounter index")
 	}
 	cur := &ui.encounterItems[index]
 	if !cur.Custom {
@@ -7272,13 +7272,13 @@ func (ui *UI) openEncounterCustomEntryEditForm(index int) {
 	apply := func() {
 		name := strings.TrimSpace(nameField.GetText())
 		if name == "" {
-			ui.status.SetText(fmt.Sprintf(" [white:red] nome non valido[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid name[-:-]  %s", helpText))
 			return
 		}
 
 		hasRoll, initRoll, initBase, ok := parseInitInput(initField.GetText())
 		if !ok {
-			ui.status.SetText(fmt.Sprintf(" [white:red] init non valida[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid init[-:-]  %s", helpText))
 			return
 		}
 
@@ -7291,7 +7291,7 @@ func (ui *UI) openEncounterCustomEntryEditForm(index int) {
 		ac := strings.TrimSpace(acField.GetText())
 		if ac != "" {
 			if _, err := strconv.Atoi(ac); err != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] AC non valida[-:-]  %s", helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid AC[-:-]  %s", helpText))
 				return
 			}
 		}
@@ -7302,7 +7302,7 @@ func (ui *UI) openEncounterCustomEntryEditForm(index int) {
 		if passiveText != "" {
 			n, err := strconv.Atoi(passiveText)
 			if err != nil || n < 0 {
-				ui.status.SetText(fmt.Sprintf(" [white:red] Passive Perception non valida[-:-]  %s", helpText))
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid Passive Perception[-:-]  %s", helpText))
 				return
 			}
 			hasPassive = true
@@ -7389,7 +7389,7 @@ func (ui *UI) openEncounterCharacterEditForm() {
 	}
 	entry := ui.encounterItems[index]
 	if !entry.Custom {
-		ui.status.SetText(fmt.Sprintf(" [white:red] edit personaggio disponibile solo per entry custom[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] character edit available only for custom entry[-:-]  %s", helpText))
 		return
 	}
 	if entry.Character == nil {
@@ -7398,7 +7398,7 @@ func (ui *UI) openEncounterCharacterEditForm() {
 	}
 	build := cloneCharacterBuild(entry.Character)
 	if build == nil {
-		ui.status.SetText(fmt.Sprintf(" [white:red] dati personaggio non validi[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] invalid character data[-:-]  %s", helpText))
 		return
 	}
 
@@ -7483,15 +7483,15 @@ func (ui *UI) openEncounterCharacterEditForm() {
 		}
 		newName := strings.TrimSpace(nameField.GetText())
 		if newName == "" {
-			return CharacterBuild{}, fmt.Errorf("nome non valido")
+			return CharacterBuild{}, fmt.Errorf("invalid name")
 		}
 		_, classLabel := classDrop.GetCurrentOption()
 		classLabel = strings.TrimSpace(classLabel)
 		if classLabel == "" {
-			return CharacterBuild{}, fmt.Errorf("classe non valida")
+			return CharacterBuild{}, fmt.Errorf("invalid class")
 		}
 		if _, ok := ui.findClassByName(classLabel); !ok {
-			return CharacterBuild{}, fmt.Errorf("classe selezionata non trovata nei dati: %s", classLabel)
+			return CharacterBuild{}, fmt.Errorf("selected class not found in data: %s", classLabel)
 		}
 		next := *cloneCharacterBuild(build)
 		next.Name = newName
@@ -7514,7 +7514,7 @@ func (ui *UI) openEncounterCharacterEditForm() {
 	refreshPreview := func() {
 		next, err := nextBuild()
 		if err != nil {
-			preview.SetText(fmt.Sprintf("[white:red]Input non valido:[-:-] %v", err))
+			preview.SetText(fmt.Sprintf("[white:red]Input error:[-:-] %v", err))
 			return
 		}
 		preview.SetText(ui.previewCharacterBuildEdit(entry, next))
@@ -7596,7 +7596,7 @@ func (ui *UI) openEncounterCharacterEditForm() {
 		ui.pushEncounterUndo()
 		err = ui.applyCharacterBuildToEncounter(index, next)
 		if err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] errore aggiornamento personaggio[-:-] %v  %s", err, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] character update error[-:-] %v  %s", err, helpText))
 			return
 		}
 
@@ -7608,9 +7608,9 @@ func (ui *UI) openEncounterCharacterEditForm() {
 		ui.renderDetailByEncounterIndex(index)
 		ui.app.SetFocus(ui.encounter)
 		if overCap {
-			ui.status.SetText(fmt.Sprintf(" [black:gold] personaggio aggiornato[-:-] %s (warning: level %d > 20)  %s", cur.CustomName, total, helpText))
+			ui.status.SetText(fmt.Sprintf(" [black:gold] character updated[-:-] %s (warning: level %d > 20)  %s", cur.CustomName, total, helpText))
 		} else {
-			ui.status.SetText(fmt.Sprintf(" [black:gold] personaggio aggiornato[-:-] %s  %s", cur.CustomName, helpText))
+			ui.status.SetText(fmt.Sprintf(" [black:gold] character updated[-:-] %s  %s", cur.CustomName, helpText))
 		}
 	}
 
@@ -7657,7 +7657,7 @@ func (ui *UI) saveCharacterBuildAs(path string) error {
 	}
 	build, _, ok := ui.selectedEncounterCharacter()
 	if !ok {
-		return errors.New("nessun personaggio custom selezionato")
+		return errors.New("no custom character selected")
 	}
 	out, err := yaml.Marshal(build)
 	if err != nil {
@@ -7683,10 +7683,10 @@ func (ui *UI) loadCharacterBuildFrom(path string) error {
 	}
 	index := ui.encounter.GetCurrentItem()
 	if index < 0 || index >= len(ui.encounterItems) {
-		return errors.New("nessuna entry encounter selezionata")
+		return errors.New("no encounter entry selected")
 	}
 	if !ui.encounterItems[index].Custom {
-		return errors.New("caricamento build disponibile solo su entry custom")
+		return errors.New("build load available only for custom entry")
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -7710,7 +7710,7 @@ func (ui *UI) loadCharacterBuildFrom(path string) error {
 
 func (ui *UI) openCharacterBuildSaveInput() {
 	if _, _, ok := ui.selectedEncounterCharacter(); !ok {
-		ui.status.SetText(fmt.Sprintf(" [white:red] seleziona un personaggio custom in Encounters[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] select a custom character in Encounters[-:-]  %s", helpText))
 		return
 	}
 	input := tview.NewInputField().SetLabel("Build file: ").SetFieldWidth(56)
@@ -7743,17 +7743,17 @@ func (ui *UI) openCharacterBuildSaveInput() {
 		}
 		path := strings.TrimSpace(input.GetText())
 		if path == "" {
-			ui.status.SetText(fmt.Sprintf(" [white:red] nome file non valido[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
 			return
 		}
 		if _, err := os.Stat(path); err == nil {
 			ui.status.SetText(fmt.Sprintf(" [black:gold] warning[-:-] sovrascrivo %s  %s", path, helpText))
 		}
 		if err := ui.saveCharacterBuildAs(path); err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] errore save build[-:-] %v  %s", err, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] save error build[-:-] %v  %s", err, helpText))
 			return
 		}
-		ui.status.SetText(fmt.Sprintf(" [black:gold] build salvato[-:-] %s  %s", path, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] build saved[-:-] %s  %s", path, helpText))
 	})
 
 	ui.pages.AddPage("character-build-save", modal, true, true)
@@ -7791,14 +7791,14 @@ func (ui *UI) openCharacterBuildLoadInput() {
 		}
 		path := strings.TrimSpace(input.GetText())
 		if path == "" {
-			ui.status.SetText(fmt.Sprintf(" [white:red] nome file non valido[-:-]  %s", helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid file name[-:-]  %s", helpText))
 			return
 		}
 		if err := ui.loadCharacterBuildFrom(path); err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] errore load build[-:-] %v  %s", err, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] loading error build[-:-] %v  %s", err, helpText))
 			return
 		}
-		ui.status.SetText(fmt.Sprintf(" [black:gold] build caricato[-:-] %s  %s", path, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] build loaded[-:-] %s  %s", path, helpText))
 	})
 
 	ui.pages.AddPage("character-build-load", modal, true, true)
@@ -7877,7 +7877,7 @@ func (ui *UI) openEncounterConditionModal() {
 		ui.renderEncounterList()
 		ui.encounter.SetCurrentItem(index)
 		ui.renderDetailByEncounterIndex(index)
-		ui.status.SetText(fmt.Sprintf(" [black:gold] condizioni[-:-] aggiornate su %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] conditions[-:-] updated on %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
 	}
 
 	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -7924,7 +7924,7 @@ func (ui *UI) clearEncounterConditions() {
 	ui.renderEncounterList()
 	ui.encounter.SetCurrentItem(index)
 	ui.renderDetailByEncounterIndex(index)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] condizioni[-:-] rimosse da %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold] conditions[-:-] removed from %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
 }
 
 func (ui *UI) removeEncounterConditionByCode(index int, code string) bool {
@@ -7955,7 +7955,7 @@ func (ui *UI) openEncounterConditionRemoveModal() {
 	}
 	entry := ui.encounterItems[index]
 	if len(entry.Conditions) == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessuna condizione da rimuovere[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no condition to remove[-:-]  %s", helpText))
 		return
 	}
 
@@ -7966,7 +7966,7 @@ func (ui *UI) openEncounterConditionRemoveModal() {
 		}
 	}
 	if len(active) == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessuna condizione da rimuovere[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no condition to remove[-:-]  %s", helpText))
 		return
 	}
 
@@ -8006,7 +8006,7 @@ func (ui *UI) openEncounterConditionRemoveModal() {
 				ui.renderEncounterList()
 				ui.encounter.SetCurrentItem(index)
 				ui.renderDetailByEncounterIndex(index)
-				ui.status.SetText(fmt.Sprintf(" [black:gold] condizioni[-:-] rimossa %s da %s  %s", conditionNameByCode(code), ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
+				ui.status.SetText(fmt.Sprintf(" [black:gold] conditions[-:-] removed %s da %s  %s", conditionNameByCode(code), ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
 			}
 			closeModal()
 			return nil
@@ -8050,9 +8050,9 @@ func (ui *UI) adjustEncounterConditionRounds(delta int) {
 	ui.encounter.SetCurrentItem(index)
 	ui.renderDetailByEncounterIndex(index)
 	if delta > 0 {
-		ui.status.SetText(fmt.Sprintf(" [black:gold] condizioni[-:-] round +1 su %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] conditions[-:-] round +1 on %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
 	} else {
-		ui.status.SetText(fmt.Sprintf(" [black:gold] condizioni[-:-] round -1 su %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] conditions[-:-] round -1 on %s  %s", ui.encounterEntryDisplay(ui.encounterItems[index]), helpText))
 	}
 }
 
@@ -8060,7 +8060,7 @@ func (ui *UI) renderEncounterList() {
 	ui.encounter.Clear()
 	if len(ui.encounterItems) == 0 {
 		ui.turnMode = false
-		ui.encounter.AddItem("Nessun mostro nell'encounter", "", 0, nil)
+		ui.encounter.AddItem("No monster in encounter", "", 0, nil)
 		return
 	}
 	if ui.turnMode {
@@ -8172,7 +8172,7 @@ func (ui *UI) openEncounterHPInput(direction int) {
 		text := strings.TrimSpace(input.GetText())
 		damage, err := strconv.Atoi(text)
 		if err != nil || damage <= 0 {
-			ui.status.SetText(fmt.Sprintf(" [white:red] valore danno non valido[-:-] \"%s\"  %s", text, helpText))
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid damage value[-:-] \"%s\"  %s", text, helpText))
 			return
 		}
 
@@ -8194,7 +8194,7 @@ func (ui *UI) openEncounterHPInput(direction int) {
 		ui.renderDetailByEncounterIndex(index)
 
 		if direction < 0 {
-			ui.status.SetText(fmt.Sprintf(" [black:gold] danno[-:-] %s -%d HP (%d/%d)  %s",
+			ui.status.SetText(fmt.Sprintf(" [black:gold] damage[-:-] %s -%d HP (%d/%d)  %s",
 				ui.encounterEntryDisplay(ui.encounterItems[index]),
 				damage,
 				ui.encounterItems[index].CurrentHP,
@@ -8202,7 +8202,7 @@ func (ui *UI) openEncounterHPInput(direction int) {
 				helpText,
 			))
 		} else {
-			ui.status.SetText(fmt.Sprintf(" [black:gold] cura[-:-] %s +%d HP (%d/%d)  %s",
+			ui.status.SetText(fmt.Sprintf(" [black:gold] heal[-:-] %s +%d HP (%d/%d)  %s",
 				ui.encounterEntryDisplay(ui.encounterItems[index]),
 				damage,
 				ui.encounterItems[index].CurrentHP,
@@ -8253,7 +8253,7 @@ func (ui *UI) deleteSelectedEncounterEntry() {
 		ui.encounter.SetCurrentItem(index)
 		ui.renderDetailByEncounterIndex(index)
 	} else {
-		ui.detailMeta.SetText("Nessun mostro nell'encounter.")
+		ui.detailMeta.SetText("No monster in encounter.")
 		ui.detailRaw.SetText("")
 		ui.rawText = ""
 	}
@@ -8274,7 +8274,7 @@ func (ui *UI) deleteAllMonsterEncounterEntries() {
 	}
 	removed := len(ui.encounterItems) - len(kept)
 	if removed <= 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessun mostro da rimuovere (solo custom/personaggi)[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no monster to remove (custom/characters only)[-:-]  %s", helpText))
 		return
 	}
 
@@ -8289,10 +8289,10 @@ func (ui *UI) deleteAllMonsterEncounterEntries() {
 		ui.turnRound = 0
 		ui.renderEncounterList()
 		ui.encounter.SetCurrentItem(0)
-		ui.detailMeta.SetText("Nessun mostro nell'encounter.")
+		ui.detailMeta.SetText("No monster in encounter.")
 		ui.detailRaw.SetText("")
 		ui.rawText = ""
-		ui.status.SetText(fmt.Sprintf(" [black:gold] rimossi[-:-] %d mostri (nessuna entry rimasta)  %s", removed, helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] removed[-:-] %d monsters (no entry left)  %s", removed, helpText))
 		return
 	}
 
@@ -8323,7 +8323,7 @@ func (ui *UI) deleteAllMonsterEncounterEntries() {
 	ui.renderEncounterList()
 	ui.encounter.SetCurrentItem(newSelected)
 	ui.renderDetailByEncounterIndex(newSelected)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] rimossi[-:-] %d mostri (custom/personaggi mantenuti)  %s", removed, helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold] removed[-:-] %d monsters (custom/characters kept)  %s", removed, helpText))
 }
 
 func (ui *UI) toggleEncounterHPMode() {
@@ -8426,7 +8426,7 @@ func (ui *UI) rollAllEncounterInitiative() {
 	}
 
 	if rolledCount == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessuna entry con dex disponibile[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no entry with available dex[-:-]  %s", helpText))
 		return
 	}
 	ui.status.SetText(fmt.Sprintf(" [black:gold] initiative[-:-] tirata per %d entry  %s", rolledCount, helpText))
@@ -8511,7 +8511,7 @@ func (ui *UI) pushEncounterUndo() {
 
 func (ui *UI) undoEncounterCommand() {
 	if len(ui.encounterUndo) == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessuna operazione da annullare[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no operation to undo[-:-]  %s", helpText))
 		return
 	}
 	current := ui.captureEncounterState()
@@ -8519,12 +8519,12 @@ func (ui *UI) undoEncounterCommand() {
 	ui.encounterUndo = ui.encounterUndo[:len(ui.encounterUndo)-1]
 	ui.encounterRedo = append(ui.encounterRedo, current)
 	ui.restoreEncounterState(last)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] undo[-:-] operazione encounter annullata  %s", helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold] undo[-:-] encounter operation undone  %s", helpText))
 }
 
 func (ui *UI) redoEncounterCommand() {
 	if len(ui.encounterRedo) == 0 {
-		ui.status.SetText(fmt.Sprintf(" [white:red] nessuna operazione da ripristinare[-:-]  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [white:red] no operation to redo[-:-]  %s", helpText))
 		return
 	}
 	current := ui.captureEncounterState()
@@ -8532,7 +8532,7 @@ func (ui *UI) redoEncounterCommand() {
 	ui.encounterRedo = ui.encounterRedo[:len(ui.encounterRedo)-1]
 	ui.encounterUndo = append(ui.encounterUndo, current)
 	ui.restoreEncounterState(last)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] redo[-:-] operazione encounter ripristinata  %s", helpText))
+	ui.status.SetText(fmt.Sprintf(" [black:gold] redo[-:-] encounter operation redone  %s", helpText))
 }
 
 func (ui *UI) captureEncounterState() EncounterUndoState {
@@ -8558,7 +8558,7 @@ func (ui *UI) restoreEncounterState(state EncounterUndoState) {
 		return
 	}
 
-	ui.detailMeta.SetText("Nessun mostro nell'encounter.")
+	ui.detailMeta.SetText("No monster in encounter.")
 	ui.detailRaw.SetText("")
 	ui.rawText = ""
 }
@@ -8574,7 +8574,7 @@ func (ui *UI) toggleEncounterTurnMode() {
 		idx := max(ui.encounter.GetCurrentItem(), 0)
 		ui.encounter.SetCurrentItem(idx)
 		ui.renderDetailByEncounterIndex(idx)
-		ui.status.SetText(fmt.Sprintf(" [black:gold] turn mode[-:-] disattivato  %s", helpText))
+		ui.status.SetText(fmt.Sprintf(" [black:gold] turn mode[-:-] disabled  %s", helpText))
 		return
 	}
 	idx := ui.findTopInitiativeEncounterIndex()
@@ -9312,7 +9312,7 @@ func loadMonstersFromBytes(b []byte) ([]Monster, []string, []string, []string, e
 		return nil, nil, nil, nil, err
 	}
 	if len(ds.Monsters) == 0 {
-		return nil, nil, nil, nil, errors.New("nessun mostro trovato nel yaml")
+		return nil, nil, nil, nil, errors.New("no monster found in yaml")
 	}
 
 	monsters := make([]Monster, 0, len(ds.Monsters))
@@ -9366,7 +9366,7 @@ func loadItemsFromBytes(b []byte) ([]Monster, []string, []string, []string, erro
 		return nil, nil, nil, nil, err
 	}
 	if len(ds.Items) == 0 {
-		return nil, nil, nil, nil, errors.New("nessun item trovato nel yaml")
+		return nil, nil, nil, nil, errors.New("no item found in yaml")
 	}
 
 	items := make([]Monster, 0, len(ds.Items))
@@ -9420,7 +9420,7 @@ func loadSpellsFromBytes(b []byte) ([]Monster, []string, []string, []string, err
 		return nil, nil, nil, nil, err
 	}
 	if len(ds.Spells) == 0 {
-		return nil, nil, nil, nil, errors.New("nessuna spell trovata nel yaml")
+		return nil, nil, nil, nil, errors.New("no spell found in yaml")
 	}
 
 	spells := make([]Monster, 0, len(ds.Spells))
@@ -9473,7 +9473,7 @@ func loadClassesFromBytes(b []byte) ([]Monster, []string, []string, []string, er
 		return nil, nil, nil, nil, err
 	}
 	if len(ds.Classes) == 0 {
-		return nil, nil, nil, nil, errors.New("nessuna classe trovata nel yaml")
+		return nil, nil, nil, nil, errors.New("no class found in yaml")
 	}
 
 	classes := make([]Monster, 0, len(ds.Classes))
@@ -9562,7 +9562,7 @@ func loadRacesFromBytes(b []byte) ([]Monster, []string, []string, []string, erro
 		return nil, nil, nil, nil, err
 	}
 	if len(ds.Races) == 0 {
-		return nil, nil, nil, nil, errors.New("nessuna razza trovata nel yaml")
+		return nil, nil, nil, nil, errors.New("no race found in yaml")
 	}
 
 	races := make([]Monster, 0, len(ds.Races))
@@ -9613,7 +9613,7 @@ func loadFeatsFromBytes(b []byte) ([]Monster, []string, []string, []string, erro
 		return nil, nil, nil, nil, err
 	}
 	if len(ds.Feats) == 0 {
-		return nil, nil, nil, nil, errors.New("nessun feat trovato nel yaml")
+		return nil, nil, nil, nil, errors.New("no feat found in yaml")
 	}
 
 	feats := make([]Monster, 0, len(ds.Feats))
@@ -10038,7 +10038,7 @@ func magicItemEconomy(raw map[string]any, rarity string) (itemEconomyInfo, bool)
 			FindTime:  "1d6 settimane",
 			CraftCost: "20,000 gp + componenti molto rari",
 			CraftTime: "25 workweeks",
-			Procedure: []string{"ricerca avanzata della formula", "quest per materiale chiave", "laboratorio/forgia adeguata", "downtime esteso con verifica DM"},
+			Procedure: []string{"advanced formula research", "quest for key material", "adequate lab/forge", "extended downtime with DM check"},
 		}, true
 	case "legendary":
 		return itemEconomyInfo{
@@ -10867,9 +10867,9 @@ func magicItemTypeByTable(table string) []string {
 	case "E":
 		return []string{"pergamena alta magia", "pozione suprema", "verga rara", "anello potente", "bastone potente", "oggetto wondrous molto raro"}
 	case "F":
-		return []string{"arma +1/+2", "scudo +2", "armatura +1 con proprietà", "arma con danno extra", "oggetto wondrous marziale", "anello difensivo"}
+		return []string{"weapon +1/+2", "shield +2", "armor +1 with property", "weapon with extra damage", "martial wondrous item", "defensive ring"}
 	case "G":
-		return []string{"arma +2", "armatura +2", "scudo +2", "verga offensiva", "bastone di potere", "oggetto wondrous molto raro"}
+		return []string{"arma +2", "armatura +2", "shield +2", "verga offensiva", "bastone di potere", "oggetto wondrous molto raro"}
 	case "H":
 		return []string{"arma +3", "armatura +3", "anello leggendario", "bastone leggendario", "verga leggendaria", "oggetto wondrous leggendario"}
 	case "I":
