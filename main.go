@@ -3860,6 +3860,9 @@ func (ui *UI) renderDetailByMonsterIndex(monsterIndex int) {
 	if speed := extractSpeed(m.Raw); speed != "" {
 		fmt.Fprintf(builder, "[white]Speed:[-] %s\n", speed)
 	}
+	if ab := abilityInline(m.Raw); ab != "" {
+		fmt.Fprintf(builder, "[white]Abilities:[-] %s\n", ab)
+	}
 	hpAverage, hpFormula := extractHP(m.Raw)
 	if hasScale {
 		if hpFormula != "" {
@@ -5944,6 +5947,20 @@ func abilityBlock(raw map[string]any) string {
 		fmt.Fprintf(b, "%2d (%+d)", v, mod)
 	}
 	return b.String()
+}
+
+func abilityInline(raw map[string]any) string {
+	keys := []string{"str", "dex", "con", "int", "wis", "cha"}
+	labels := []string{"STR", "DEX", "CON", "INT", "WIS", "CHA"}
+	parts := make([]string, 0, len(keys))
+	for i, k := range keys {
+		v, ok := anyToInt(raw[k])
+		if !ok {
+			return ""
+		}
+		parts = append(parts, fmt.Sprintf("%s %d (%+d)", labels[i], v, abilityMod(v)))
+	}
+	return strings.Join(parts, " ")
 }
 
 func plainSection(v any) string {
