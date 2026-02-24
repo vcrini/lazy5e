@@ -1009,6 +1009,62 @@ func TestEncounterEntryDisplayCustomDoesNotShowOrdinal(t *testing.T) {
 	}
 }
 
+func TestEncounterTempHPRules(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
+	ui.encounterItems = []EncounterEntry{
+		{MonsterIndex: 0, Ordinal: 1, BaseHP: 13, CurrentHP: 13, TempHP: 10},
+	}
+	ui.renderEncounterList()
+	ui.encounter.SetCurrentItem(0)
+
+	tempSpent, hpSpent := ui.applyEncounterDamage(0, 5)
+	if tempSpent != 5 || hpSpent != 0 {
+		t.Fatalf("expected damage to consume only temp hp first, got temp=%d hp=%d", tempSpent, hpSpent)
+	}
+	if ui.encounterItems[0].TempHP != 5 || ui.encounterItems[0].CurrentHP != 13 {
+		t.Fatalf("unexpected state after first damage: temp=%d hp=%d", ui.encounterItems[0].TempHP, ui.encounterItems[0].CurrentHP)
+	}
+
+	if got := ui.applyEncounterTempHPValue(0, 3); got != 5 {
+		t.Fatalf("expected temp hp to stay at max(5,3)=5, got %d", got)
+	}
+	if got := ui.applyEncounterTempHPValue(0, 7); got != 7 {
+		t.Fatalf("expected temp hp to become max(5,7)=7, got %d", got)
+	}
+
+	tempSpent, hpSpent = ui.applyEncounterDamage(0, 10)
+	if tempSpent != 7 || hpSpent != 3 {
+		t.Fatalf("expected damage split temp/hp 7/3, got %d/%d", tempSpent, hpSpent)
+	}
+	if ui.encounterItems[0].TempHP != 0 || ui.encounterItems[0].CurrentHP != 10 {
+		t.Fatalf("unexpected state after second damage: temp=%d hp=%d", ui.encounterItems[0].TempHP, ui.encounterItems[0].CurrentHP)
+	}
+}
+
+func TestEncounterTempHPRemovedFromRowWhenZero(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
+	ui.encounterItems = []EncounterEntry{
+		{MonsterIndex: 0, Ordinal: 1, BaseHP: 13, CurrentHP: 13, TempHP: 8},
+	}
+	ui.renderEncounterList()
+	ui.encounter.SetCurrentItem(0)
+
+	line, _ := ui.encounter.GetItemText(0)
+	if !strings.Contains(line, "[THP 8]") {
+		t.Fatalf("expected THP marker in row, got: %q", line)
+	}
+
+	ui.applyEncounterDamage(0, 10)
+	ui.renderEncounterList()
+	line, _ = ui.encounter.GetItemText(0)
+	if strings.Contains(line, "[THP") {
+		t.Fatalf("expected THP marker removed at zero, got: %q", line)
+	}
+	if ui.encounterItems[0].CurrentHP != 11 {
+		t.Fatalf("expected 2 damage to hp after 8 temp hp absorbed, got hp=%d", ui.encounterItems[0].CurrentHP)
+	}
+}
+
 func TestEncounterConditionsBadgeAndRoundProgress(t *testing.T) {
 	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
 	ui.encounterItems = []EncounterEntry{

@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
+	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
 	defaultAppDirName     = ".lazy5e"
 	defaultEncountersFile = "encounters.yaml"
 	lastEncountersFile    = ".encounters_last_path"
@@ -137,6 +137,7 @@ type EncounterEntry struct {
 	Conditions       map[string]int
 	BaseHP           int
 	CurrentHP        int
+	TempHP           int
 	HPFormula        string
 	UseRolledHP      bool
 	RolledHP         int
@@ -181,6 +182,7 @@ type PersistedEncounterItem struct {
 	Conditions       map[string]int  `yaml:"conditions,omitempty"`
 	BaseHP           int             `yaml:"base_hp"`
 	CurrentHP        int             `yaml:"current_hp"`
+	TempHP           int             `yaml:"temp_hp,omitempty"`
 	HPFormula        string          `yaml:"hp_formula,omitempty"`
 	UseRolled        bool            `yaml:"use_rolled,omitempty"`
 	RolledHP         int             `yaml:"rolled_hp,omitempty"`
@@ -1184,6 +1186,15 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case focus == ui.encounter && event.Key() == tcell.KeyRight:
 			ui.openEncounterHPInput(1)
 			return nil
+		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'h':
+			ui.openEncounterHPInput(-1)
+			return nil
+		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'L':
+			ui.openEncounterTempHPInput()
+			return nil
+		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'H':
+			ui.clearEncounterTempHP()
+			return nil
 		case focus == ui.list && ui.browseMode == BrowseMonsters && event.Key() == tcell.KeyLeft:
 			ui.adjustSelectedMonsterScale(-1)
 			return nil
@@ -1461,8 +1472,10 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  x : remove one condition from entry\n" +
 			"  C : clear all conditions from entry\n" +
 			"  [ / ] : decrease/increase condition rounds\n" +
+			"  L : set/update Temp HP (max rule)\n" +
+			"  H : clear Temp HP\n" +
 			"  space : switch HP average/formula (roll)\n" +
-			"  left arrow : subtract HP\n" +
+			"  h / left arrow : subtract HP (Temp HP consumed first)\n" +
 			"  right arrow : add HP\n"
 	case ui.list:
 		if ui.browseMode == BrowseMonsters {
@@ -3743,7 +3756,9 @@ func (ui *UI) renderDetailByEncounterIndex(encounterIndex int) {
 		ui.renderDetailByMonsterIndex(entry.MonsterIndex)
 	}
 	ui.applyEncounterConditionsOverlay(entry)
-	ui.detailMeta.SetText(ui.ensureEncounterPassivePerceptionLine(entry, ui.detailMeta.GetText(false)))
+	meta := ui.ensureEncounterPassivePerceptionLine(entry, ui.detailMeta.GetText(false))
+	meta = ui.ensureEncounterTempHPLine(entry, meta)
+	ui.detailMeta.SetText(meta)
 	ui.restoreDescriptionScrollForKey(descKey)
 }
 
@@ -4016,6 +4031,9 @@ func (ui *UI) renderDetailByCustomEntry(entry EncounterEntry) {
 			fmt.Fprintf(builder, "[white]HP:[-] %d/%d\n", entry.CurrentHP, maxHP)
 		} else {
 			fmt.Fprintf(builder, "[white]HP:[-] ?\n")
+		}
+		if entry.TempHP > 0 {
+			fmt.Fprintf(builder, "[white]Temp HP:[-] %d\n", entry.TempHP)
 		}
 		meta = builder.String()
 	}
@@ -5833,6 +5851,9 @@ func buildCustomDescriptionText(entry EncounterEntry, maxHP int) string {
 		fmt.Fprintf(b, "Hit Points: %d/%d\n", entry.CurrentHP, maxHP)
 	} else {
 		fmt.Fprintf(b, "Hit Points: ?\n")
+	}
+	if entry.TempHP > 0 {
+		fmt.Fprintf(b, "Temp HP: %d\n", entry.TempHP)
 	}
 	if len(entry.Conditions) > 0 {
 		parts := []string{}
@@ -8102,6 +8123,9 @@ func (ui *UI) renderEncounterList() {
 		} else {
 			label = fmt.Sprintf("%s [HP ?]", label)
 		}
+		if item.TempHP > 0 {
+			label = fmt.Sprintf("%s [THP %d]", label, item.TempHP)
+		}
 		if badge := ui.encounterConditionsBadge(item); badge != "" {
 			if after, ok := strings.CutPrefix(label, "X "); ok {
 				label = "X " + badge + " " + after
@@ -8178,35 +8202,32 @@ func (ui *UI) openEncounterHPInput(direction int) {
 
 		ui.pushEncounterUndo()
 		if direction < 0 {
-			ui.encounterItems[index].CurrentHP -= damage
-			if ui.encounterItems[index].CurrentHP < 0 {
-				ui.encounterItems[index].CurrentHP = 0
-			}
+			tempSpent, hpSpent := ui.applyEncounterDamage(index, damage)
+			_ = hpSpent
+			_ = tempSpent
 		} else {
-			ui.encounterItems[index].CurrentHP += damage
-			maxHP := ui.encounterMaxHP(ui.encounterItems[index])
-			if maxHP > 0 && ui.encounterItems[index].CurrentHP > maxHP {
-				ui.encounterItems[index].CurrentHP = maxHP
-			}
+			ui.applyEncounterHealing(index, damage)
 		}
 		ui.renderEncounterList()
 		ui.encounter.SetCurrentItem(index)
 		ui.renderDetailByEncounterIndex(index)
 
 		if direction < 0 {
-			ui.status.SetText(fmt.Sprintf(" [black:gold] damage[-:-] %s -%d HP (%d/%d)  %s",
+			ui.status.SetText(fmt.Sprintf(" [black:gold] damage[-:-] %s -%d HP (%d/%d, THP %d)  %s",
 				ui.encounterEntryDisplay(ui.encounterItems[index]),
 				damage,
 				ui.encounterItems[index].CurrentHP,
 				ui.encounterMaxHP(ui.encounterItems[index]),
+				ui.encounterItems[index].TempHP,
 				helpText,
 			))
 		} else {
-			ui.status.SetText(fmt.Sprintf(" [black:gold] heal[-:-] %s +%d HP (%d/%d)  %s",
+			ui.status.SetText(fmt.Sprintf(" [black:gold] heal[-:-] %s +%d HP (%d/%d, THP %d)  %s",
 				ui.encounterEntryDisplay(ui.encounterItems[index]),
 				damage,
 				ui.encounterItems[index].CurrentHP,
 				ui.encounterMaxHP(ui.encounterItems[index]),
+				ui.encounterItems[index].TempHP,
 				helpText,
 			))
 		}
@@ -8214,6 +8235,142 @@ func (ui *UI) openEncounterHPInput(direction int) {
 
 	ui.pages.AddPage("encounter-damage", modal, true, true)
 	ui.app.SetFocus(input)
+}
+
+func (ui *UI) applyEncounterDamage(index int, damage int) (tempSpent int, hpSpent int) {
+	if index < 0 || index >= len(ui.encounterItems) || damage <= 0 {
+		return 0, 0
+	}
+	entry := &ui.encounterItems[index]
+	remaining := damage
+	if entry.TempHP > 0 {
+		tempSpent = min(entry.TempHP, remaining)
+		entry.TempHP -= tempSpent
+		if entry.TempHP < 0 {
+			entry.TempHP = 0
+		}
+		remaining -= tempSpent
+	}
+	if remaining > 0 {
+		before := entry.CurrentHP
+		entry.CurrentHP -= remaining
+		if entry.CurrentHP < 0 {
+			entry.CurrentHP = 0
+		}
+		hpSpent = max(0, before-entry.CurrentHP)
+	}
+	return tempSpent, hpSpent
+}
+
+func (ui *UI) applyEncounterHealing(index int, healing int) {
+	if index < 0 || index >= len(ui.encounterItems) || healing <= 0 {
+		return
+	}
+	ui.encounterItems[index].CurrentHP += healing
+	maxHP := ui.encounterMaxHP(ui.encounterItems[index])
+	if maxHP > 0 && ui.encounterItems[index].CurrentHP > maxHP {
+		ui.encounterItems[index].CurrentHP = maxHP
+	}
+}
+
+func (ui *UI) openEncounterTempHPInput() {
+	if len(ui.encounterItems) == 0 {
+		return
+	}
+	index := ui.encounter.GetCurrentItem()
+	if index < 0 || index >= len(ui.encounterItems) {
+		return
+	}
+	entry := ui.encounterItems[index]
+
+	input := tview.NewInputField().
+		SetLabel("Temp HP ").
+		SetFieldWidth(12)
+	input.SetLabelColor(tcell.ColorGold)
+	input.SetFieldBackgroundColor(tcell.ColorWhite)
+	input.SetFieldTextColor(tcell.ColorBlack)
+	input.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	input.SetBackgroundColor(tcell.ColorBlack)
+	input.SetBorder(true)
+	input.SetTitle(" Set Temp HP (x or -x) ")
+	input.SetBorderColor(tcell.ColorGold)
+	input.SetTitleColor(tcell.ColorGold)
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(input, 3, 0, true).
+			AddItem(nil, 0, 1, false), 44, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	input.SetDoneFunc(func(key tcell.Key) {
+		ui.pages.RemovePage("encounter-thp")
+		ui.app.SetFocus(ui.encounter)
+		if key == tcell.KeyEscape || key != tcell.KeyEnter {
+			return
+		}
+
+		text := strings.TrimSpace(input.GetText())
+		val, err := strconv.Atoi(text)
+		if err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid temp HP value[-:-] \"%s\"  %s", text, helpText))
+			return
+		}
+
+		ui.pushEncounterUndo()
+		next := ui.applyEncounterTempHPValue(index, val)
+		ui.renderEncounterList()
+		ui.encounter.SetCurrentItem(index)
+		ui.renderDetailByEncounterIndex(index)
+		ui.status.SetText(fmt.Sprintf(" [black:gold] temp hp[-:-] %s -> %d  %s",
+			ui.encounterEntryDisplay(entry),
+			next,
+			helpText,
+		))
+	})
+
+	ui.pages.AddPage("encounter-thp", modal, true, true)
+	ui.app.SetFocus(input)
+}
+
+func (ui *UI) applyEncounterTempHPValue(index int, val int) int {
+	if index < 0 || index >= len(ui.encounterItems) {
+		return 0
+	}
+	cur := ui.encounterItems[index].TempHP
+	next := cur
+	if val > 0 {
+		next = max(cur, val)
+	} else if val < 0 {
+		next = max(0, cur+val)
+	} else {
+		next = 0
+	}
+	ui.encounterItems[index].TempHP = next
+	return next
+}
+
+func (ui *UI) clearEncounterTempHP() {
+	if len(ui.encounterItems) == 0 {
+		return
+	}
+	index := ui.encounter.GetCurrentItem()
+	if index < 0 || index >= len(ui.encounterItems) {
+		return
+	}
+	if ui.encounterItems[index].TempHP <= 0 {
+		return
+	}
+	ui.pushEncounterUndo()
+	ui.encounterItems[index].TempHP = 0
+	ui.renderEncounterList()
+	ui.encounter.SetCurrentItem(index)
+	ui.renderDetailByEncounterIndex(index)
+	ui.status.SetText(fmt.Sprintf(" [black:gold] temp hp[-:-] cleared for %s  %s",
+		ui.encounterEntryDisplay(ui.encounterItems[index]),
+		helpText,
+	))
 }
 
 func (ui *UI) deleteSelectedEncounterEntry() {
@@ -8761,6 +8918,7 @@ func (ui *UI) loadEncounters() error {
 			Conditions:       cloneStringIntMap(it.Conditions),
 			BaseHP:           baseHP,
 			CurrentHP:        currentHP,
+			TempHP:           max(0, it.TempHP),
 			HPFormula:        hpFormula,
 			UseRolledHP:      it.UseRolled,
 			RolledHP:         it.RolledHP,
@@ -8813,6 +8971,9 @@ func (ui *UI) backfillCustomEncounterDetails(entry *EncounterEntry) {
 			fmt.Fprintf(b, "[white]HP:[-] %d/%d\n", entry.CurrentHP, maxHP)
 		} else {
 			fmt.Fprintf(b, "[white]HP:[-] ?\n")
+		}
+		if entry.TempHP > 0 {
+			fmt.Fprintf(b, "[white]Temp HP:[-] %d\n", entry.TempHP)
 		}
 		entry.CustomMeta = strings.TrimSpace(b.String())
 	}
@@ -8900,6 +9061,7 @@ func (ui *UI) saveEncounters() error {
 			Conditions:       cloneStringIntMap(it.Conditions),
 			BaseHP:           it.BaseHP,
 			CurrentHP:        it.CurrentHP,
+			TempHP:           max(0, it.TempHP),
 			HPFormula:        it.HPFormula,
 			UseRolled:        it.UseRolledHP,
 			RolledHP:         it.RolledHP,
@@ -11102,6 +11264,7 @@ var (
 	hpFormulaRe   = regexp.MustCompile(`^\s*(\d+)\s*[dD]\s*(\d+)(?:\s*([+-])\s*(\d+))?\s*$`)
 	finalResultRe = regexp.MustCompile(`[-+]?\d+`)
 	ppLineRe      = regexp.MustCompile(`(?mi)^\s*\[?[^\n]*passive perception[^\n]*:\s*([0-9]+)\s*$`)
+	thpLineRe     = regexp.MustCompile(`(?mi)^\s*\[?[^\n]*temp hp[^\n]*:\s*([0-9]+)\s*$`)
 )
 
 func extractPassivePerceptionFromMonster(raw map[string]any) (int, bool) {
@@ -11230,6 +11393,25 @@ func (ui *UI) ensureEncounterPassivePerceptionLine(entry EncounterEntry, meta st
 		return setPassivePerceptionLine(meta, p)
 	}
 	return setPassivePerceptionUnknownLine(meta)
+}
+
+func (ui *UI) ensureEncounterTempHPLine(entry EncounterEntry, meta string) string {
+	trimmed := strings.TrimSpace(meta)
+	lines := []string{}
+	if trimmed != "" {
+		raw := strings.Split(trimmed, "\n")
+		lines = make([]string, 0, len(raw)+1)
+		for _, ln := range raw {
+			if thpLineRe.MatchString(ln) || strings.Contains(strings.ToLower(ln), "temp hp:") {
+				continue
+			}
+			lines = append(lines, ln)
+		}
+	}
+	if entry.TempHP > 0 {
+		lines = append(lines, fmt.Sprintf("[white]Temp HP:[-] %d", entry.TempHP))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func rollHPFormula(formula string) (int, bool) {
