@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	helpTextBase          = " [black:gold] q [-:-] esci  [black:gold] / [-:-] cerca (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] pannelli  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] browse diretto  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] naviga  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] spazio [-:-] avg/formula HP  [black:gold] ←/→ [-:-] danno/cura encounter  [black:gold] PgUp/PgDn [-:-] scroll Description "
+	helpTextBase          = " [black:gold] q [-:-] esci  [black:gold] / [-:-] cerca (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] pannelli  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] browse diretto  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] naviga  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] spazio [-:-] avg/formula HP  [black:gold] ←/→ [-:-] danno/cura encounter  [black:gold] PgUp/PgDn [-:-] scroll Description "
 	defaultAppDirName     = ".lazy5e"
 	defaultEncountersFile = "encounters.yaml"
 	lastEncountersFile    = ".encounters_last_path"
@@ -996,6 +996,10 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case event.Key() == tcell.KeyBacktab:
 			ui.focusPrev()
 			return nil
+		case (focus == ui.list || focus == ui.nameInput || focus == ui.envDrop || focus == ui.sourceDrop || focus == ui.crDrop || focus == ui.typeDrop) &&
+			event.Key() == tcell.KeyRune && event.Rune() == 'x':
+			ui.clearCurrentBrowseFilters()
+			return nil
 		case focus == ui.sourceDrop && (event.Key() == tcell.KeyEnter || (event.Key() == tcell.KeyRune && event.Rune() == ' ')):
 			ui.openSourceMultiSelectModal()
 			return nil
@@ -1469,6 +1473,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"  a : aggiungi mostro a Encounters\n" +
 				"  m : genera tesoro da CR (regole 5e)\n" +
 				"  l : genera lair treasure da CR (regole 5e)\n" +
+				"  x : pulisci tutti i filtri\n" +
 				"  freccia sinistra/destra : scala CR del mostro (-/+) con benchmark 5e\n" +
 				"  n / e / s / c / t : focus su Name / Env / Source(multi) / CR / Type\n" +
 				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
@@ -1481,6 +1486,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"  / : cerca nella Description della voce selezionata\n" +
 				"  g : genera treasure items (tipo + quantita)\n" +
 				"  S : salva Treasure su file\n" +
+				"  x : pulisci tutti i filtri\n" +
 				"  n / s / r / t : focus su Name / Source(multi) / Rarity / Type\n" +
 				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
 				"  PgUp / PgDn : scroll del pannello Description\n"
@@ -1491,6 +1497,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"  j / k (o frecce) : naviga lista\n" +
 				"  / : cerca nella Description della voce selezionata\n" +
 				"  g : genera spells (level + quantita)\n" +
+				"  x : pulisci tutti i filtri\n" +
 				"  n / s / l / c : focus su Name / Source(multi) / Level / School\n" +
 				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
 				"  PgUp / PgDn : scroll del pannello Description\n"
@@ -1501,6 +1508,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"  j / k (o frecce) : naviga classi\n" +
 				"  / : cerca nella Description della classe selezionata\n" +
 				"  a : crea personaggio (livello + razza)\n" +
+				"  x : pulisci tutti i filtri\n" +
 				"  n / e / s / c / t : focus su Name / Primary / Source(multi) / Hit Die / Caster\n" +
 				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
 				"  PgUp / PgDn : scroll del pannello Description\n"
@@ -1510,6 +1518,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"[black:gold]Manuals[-:-]\n" +
 				"  j / k (o frecce) : naviga manuali\n" +
 				"  / : cerca nella Description del manuale selezionato\n" +
+				"  x : pulisci tutti i filtri\n" +
 				"  n / e / s / c / t : focus su Name / Group / Source(multi) / Year / Author\n" +
 				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats/Manuals/Adventures\n" +
 				"  PgUp / PgDn : scroll del pannello Description\n"
@@ -1519,6 +1528,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"[black:gold]Adventures[-:-]\n" +
 				"  j / k (o frecce) : naviga avventure\n" +
 				"  / : cerca nella Description dell'avventura selezionata\n" +
+				"  x : pulisci tutti i filtri\n" +
 				"  n / e / s / c / t : focus su Name / Group / Source(multi) / Year / Author\n" +
 				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats/Manuals/Adventures\n" +
 				"  PgUp / PgDn : scroll del pannello Description\n"
@@ -1528,6 +1538,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"[black:gold]Races[-:-]\n" +
 				"  j / k (o frecce) : naviga razze\n" +
 				"  / : cerca nella Description della razza selezionata\n" +
+				"  x : pulisci tutti i filtri\n" +
 				"  n / e / s / c / t : focus su Name / Ability / Source(multi) / Size / Lineage\n" +
 				"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
 				"  PgUp / PgDn : scroll del pannello Description\n"
@@ -1536,6 +1547,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"[black:gold]Feats[-:-]\n" +
 			"  j / k (o frecce) : naviga talenti\n" +
 			"  / : cerca nella Description del talento selezionato\n" +
+			"  x : pulisci tutti i filtri\n" +
 			"  n / e / s / c / t : focus su Name / Prereq / Source(multi) / Category / Ability\n" +
 			"  [ / ] : cambia panel Monsters/Items/Spells/Characters/Races/Feats\n" +
 			"  PgUp / PgDn : scroll del pannello Description\n"
@@ -1553,11 +1565,13 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		return header +
 			"[black:gold]Name Filter[-:-]\n" +
 			"  scrivi testo : filtro per nome\n" +
+			"  x : pulisci tutti i filtri\n" +
 			"  Enter / Esc : torna a Monsters\n"
 	case ui.envDrop, ui.sourceDrop, ui.crDrop, ui.typeDrop:
 		return header +
 			"[black:gold]Filter Dropdown[-:-]\n" +
-			"  frecce / Invio : cambia valore filtro\n"
+			"  frecce / Invio : cambia valore filtro\n" +
+			"  x : pulisci tutti i filtri\n"
 	default:
 		return header + "[black:gold]Panel[-:-]\n  Nessuna scorciatoia specifica.\n"
 	}
@@ -3395,6 +3409,24 @@ func (ui *UI) maybeReturnFocusToListFromFilter() {
 	if focus == ui.envDrop || focus == ui.crDrop || focus == ui.typeDrop {
 		ui.app.SetFocus(ui.list)
 	}
+}
+
+func (ui *UI) clearCurrentBrowseFilters() {
+	ui.nameFilter = ""
+	ui.envFilter = ""
+	ui.crFilter = ""
+	ui.typeFilter = ""
+	ui.sourceFilters = map[string]struct{}{}
+
+	ui.nameInput.SetText("")
+	ui.setDropDownByValue(ui.envDrop, ui.envOptions, "")
+	ui.setDropDownByValue(ui.crDrop, ui.crOptions, "")
+	ui.setDropDownByValue(ui.typeDrop, ui.typeOptions, "")
+	ui.refreshSourceDropOptions(-1)
+	ui.applyFilters()
+	ui.saveCurrentModeFilters()
+	ui.app.SetFocus(ui.list)
+	ui.status.SetText(fmt.Sprintf(" [black:gold]filtri[-:-] resettati (%s)  %s", ui.browseModeName(), helpText))
 }
 
 func (ui *UI) descriptionKeyForMode(mode BrowseMode, idx int) string {
