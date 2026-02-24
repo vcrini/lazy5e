@@ -517,6 +517,8 @@ type UI struct {
 	focusOrder     []tview.Primitive
 	rawText        string
 	rawQuery       string
+	rawMatchLine   int
+	rawMatchOcc    int
 	treasureText   string
 	diceLog        []DiceResult
 	diceRender     bool
@@ -694,6 +696,8 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		bookBodyCache:     map[string]string{},
 		advBodyCache:      map[string]string{},
 		activeBottomPanel: "description",
+		rawMatchLine:      -1,
+		rawMatchOcc:       -1,
 	}
 
 	ui.nameInput = tview.NewInputField().
@@ -1062,6 +1066,12 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 				return nil
 			}
 			ui.app.SetFocus(ui.nameInput)
+			return nil
+		case focus == ui.detailRaw && event.Key() == tcell.KeyRune && event.Rune() == 'n':
+			ui.repeatRawSearch(true)
+			return nil
+		case focus == ui.detailRaw && event.Key() == tcell.KeyRune && event.Rune() == 'N':
+			ui.repeatRawSearch(false)
 			return nil
 		case event.Key() == tcell.KeyTab:
 			ui.focusNext()
@@ -1713,6 +1723,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		return header +
 			"[black:gold]Description[-:-]\n" +
 			"  / : search text in current Description\n" +
+			"  n / N : next / previous search match\n" +
 			"  j / k (or arrows) : scroll content\n"
 	case ui.detailMeta, ui.detailTreasure:
 		return header +
@@ -6609,25 +6620,63 @@ func (ui *UI) openRawSearch(returnFocus tview.Primitive) {
 		query := strings.TrimSpace(input.GetText())
 		if query == "" {
 			ui.rawQuery = ""
+			ui.rawMatchLine = -1
+			ui.rawMatchOcc = -1
 			ui.renderRawWithHighlight("", -1)
 			ui.status.SetText(helpText)
 			return
 		}
-		line, ok := ui.findRawMatch(query)
+		start, _ := ui.detailRaw.GetScrollOffset()
+		line, occ, ok := ui.findNextRawOccurrence(query, start, -1, true)
 		if !ok {
 			ui.rawQuery = query
+			ui.rawMatchLine = -1
+			ui.rawMatchOcc = -1
 			ui.renderRawWithHighlight(query, -1)
 			ui.status.SetText(fmt.Sprintf(" [white:red] no match in Description [-:-] \"%s\"  %s", query, helpText))
 			return
 		}
 		ui.rawQuery = query
-		ui.renderRawWithHighlight(query, line)
+		ui.rawMatchLine = line
+		ui.rawMatchOcc = occ
+		ui.renderRawWithHighlightOccurrence(query, line, occ)
 		ui.detailRaw.ScrollTo(line, 0)
 		ui.status.SetText(fmt.Sprintf(" [black:gold] trovato nella Description[-:-] \"%s\" (riga %d)  %s", query, line+1, helpText))
 	})
 
 	ui.pages.AddPage("raw-search", modal, true, true)
 	ui.app.SetFocus(input)
+}
+
+func (ui *UI) repeatRawSearch(forward bool) {
+	query := strings.TrimSpace(ui.rawQuery)
+	if query == "" {
+		ui.status.SetText(fmt.Sprintf(" [white:red] no active search in Description [-:-]  %s", helpText))
+		return
+	}
+	startLine := ui.rawMatchLine
+	startOcc := ui.rawMatchOcc
+	if startLine < 0 || !strings.EqualFold(ui.rawQuery, query) {
+		startLine, _ = ui.detailRaw.GetScrollOffset()
+		if forward {
+			startOcc = -1
+		} else {
+			startOcc = 0
+		}
+	}
+	line, occ, ok := ui.findNextRawOccurrence(query, startLine, startOcc, forward)
+	if !ok {
+		ui.rawMatchLine = -1
+		ui.rawMatchOcc = -1
+		ui.renderRawWithHighlight(query, -1)
+		ui.status.SetText(fmt.Sprintf(" [white:red] no match in Description [-:-] \"%s\"  %s", query, helpText))
+		return
+	}
+	ui.rawMatchLine = line
+	ui.rawMatchOcc = occ
+	ui.renderRawWithHighlightOccurrence(query, line, occ)
+	ui.detailRaw.ScrollTo(line, 0)
+	ui.status.SetText(fmt.Sprintf(" [black:gold] trovato nella Description[-:-] \"%s\" (riga %d)  %s", query, line+1, helpText))
 }
 
 func (ui *UI) openEncounterSaveAsInput() {
@@ -10028,6 +10077,10 @@ func writeLastBuildPath(path string) error {
 }
 
 func (ui *UI) renderRawWithHighlight(query string, lineToHighlight int) {
+	ui.renderRawWithHighlightOccurrence(query, lineToHighlight, -1)
+}
+
+func (ui *UI) renderRawWithHighlightOccurrence(query string, lineToHighlight int, occToHighlight int) {
 	if ui.rawText == "" {
 		ui.detailRaw.SetText("")
 		return
@@ -10040,7 +10093,7 @@ func (ui *UI) renderRawWithHighlight(query string, lineToHighlight int) {
 			b.WriteByte('\n')
 		}
 		if query != "" && i == lineToHighlight {
-			b.WriteString(highlightEscaped(line, query))
+			b.WriteString(highlightEscapedOccurrence(line, query, occToHighlight))
 		} else {
 			b.WriteString(tview.Escape(line))
 		}
@@ -10049,6 +10102,10 @@ func (ui *UI) renderRawWithHighlight(query string, lineToHighlight int) {
 }
 
 func highlightEscaped(line, query string) string {
+	return highlightEscapedOccurrence(line, query, -1)
+}
+
+func highlightEscapedOccurrence(line, query string, occToHighlight int) string {
 	if query == "" {
 		return tview.Escape(line)
 	}
@@ -10057,6 +10114,7 @@ func highlightEscaped(line, query string) string {
 
 	var b strings.Builder
 	start := 0
+	occ := 0
 	for {
 		idx := strings.Index(lowerLine[start:], lowerQuery)
 		if idx < 0 {
@@ -10066,10 +10124,15 @@ func highlightEscaped(line, query string) string {
 		abs := start + idx
 		end := abs + len(query)
 		b.WriteString(tview.Escape(line[start:abs]))
-		b.WriteString("[black:gold]")
-		b.WriteString(tview.Escape(line[abs:end]))
-		b.WriteString("[-:-]")
+		if occToHighlight < 0 || occ == occToHighlight {
+			b.WriteString("[black:gold]")
+			b.WriteString(tview.Escape(line[abs:end]))
+			b.WriteString("[-:-]")
+		} else {
+			b.WriteString(tview.Escape(line[abs:end]))
+		}
 		start = end
+		occ++
 		if start >= len(line) {
 			break
 		}
@@ -10086,7 +10149,6 @@ func (ui *UI) findRawMatch(query string) (int, bool) {
 		return 0, false
 	}
 
-	q := strings.ToLower(query)
 	start, _ := ui.detailRaw.GetScrollOffset()
 	if start < 0 {
 		start = 0
@@ -10094,13 +10156,140 @@ func (ui *UI) findRawMatch(query string) (int, bool) {
 	if start >= len(lines) {
 		start = len(lines) - 1
 	}
+	startOcc := rawLineMatchCount(lines[start], query) - 1
+	line, _, ok := ui.findNextRawOccurrence(query, start, startOcc, true)
+	if ok {
+		return line, true
+	}
+	line, _, ok = ui.findNextRawOccurrence(query, -1, -1, true)
+	return line, ok
+}
 
-	for i := start + 1; i < len(lines); i++ {
-		if strings.Contains(strings.ToLower(lines[i]), q) {
-			return i, true
+func rawLineMatchCount(line, query string) int {
+	if query == "" {
+		return 0
+	}
+	lowerLine := strings.ToLower(line)
+	lowerQuery := strings.ToLower(query)
+	if lowerQuery == "" {
+		return 0
+	}
+	count := 0
+	start := 0
+	for {
+		idx := strings.Index(lowerLine[start:], lowerQuery)
+		if idx < 0 {
+			return count
+		}
+		count++
+		start += idx + len(query)
+		if start >= len(line) {
+			return count
 		}
 	}
-	for i := 0; i <= start && i < len(lines); i++ {
+}
+
+func (ui *UI) findNextRawOccurrence(query string, startLine int, startOcc int, forward bool) (int, int, bool) {
+	if strings.TrimSpace(query) == "" || ui.rawText == "" {
+		return 0, 0, false
+	}
+	lines := strings.Split(ui.rawText, "\n")
+	if len(lines) == 0 {
+		return 0, 0, false
+	}
+	if startLine < -1 {
+		startLine = -1
+	}
+	if startLine > len(lines) {
+		startLine = len(lines)
+	}
+	if startOcc < -1 {
+		startOcc = -1
+	}
+
+	if forward {
+		for l := max(0, startLine); l < len(lines); l++ {
+			count := rawLineMatchCount(lines[l], query)
+			if count == 0 {
+				continue
+			}
+			first := 0
+			if l == startLine {
+				first = startOcc + 1
+			}
+			if first < 0 {
+				first = 0
+			}
+			if first < count {
+				return l, first, true
+			}
+		}
+		for l := 0; l < len(lines); l++ {
+			count := rawLineMatchCount(lines[l], query)
+			if count == 0 {
+				continue
+			}
+			if l == startLine && startOcc >= 0 && startOcc < count {
+				if 0 <= startOcc {
+					return l, 0, true
+				}
+			}
+			return l, 0, true
+		}
+		return 0, 0, false
+	}
+
+	if startLine == len(lines) {
+		startLine = len(lines) - 1
+	}
+	for l := min(startLine, len(lines)-1); l >= 0; l-- {
+		count := rawLineMatchCount(lines[l], query)
+		if count == 0 {
+			continue
+		}
+		last := count - 1
+		if l == startLine && startOcc >= 0 {
+			last = startOcc - 1
+		}
+		if last >= 0 && last < count {
+			return l, last, true
+		}
+	}
+	for l := len(lines) - 1; l >= 0; l-- {
+		count := rawLineMatchCount(lines[l], query)
+		if count == 0 {
+			continue
+		}
+		return l, count - 1, true
+	}
+	return 0, 0, false
+}
+
+func (ui *UI) findRawMatchFrom(query string, start int, forward bool) (int, bool) {
+	if strings.TrimSpace(query) == "" || ui.rawText == "" {
+		return 0, false
+	}
+	lines := strings.Split(ui.rawText, "\n")
+	if len(lines) == 0 {
+		return 0, false
+	}
+	if start < 0 {
+		start = -1
+	}
+	if start >= len(lines) {
+		start = len(lines)
+	}
+
+	q := strings.ToLower(query)
+	if forward {
+		for i := start + 1; i < len(lines); i++ {
+			if strings.Contains(strings.ToLower(lines[i]), q) {
+				return i, true
+			}
+		}
+		return 0, false
+	}
+	for i := start - 1; i >= 0; i-- {
 		if strings.Contains(strings.ToLower(lines[i]), q) {
 			return i, true
 		}

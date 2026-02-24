@@ -1796,6 +1796,9 @@ func TestHelpForFocusIncludesPanelShortcuts(t *testing.T) {
 	if !strings.Contains(rawHelp, "/ : search text in current Description") {
 		t.Fatalf("raw help missing raw find shortcut:\n%s", rawHelp)
 	}
+	if !strings.Contains(rawHelp, "n / N : next / previous search match") {
+		t.Fatalf("raw help missing next/previous search shortcut:\n%s", rawHelp)
+	}
 }
 
 func TestTurnModeFullCycleAndRenderMarkers(t *testing.T) {
@@ -1886,6 +1889,39 @@ func TestHighlightEscapedAndFindRawMatch(t *testing.T) {
 	lineIdx, ok := ui.findRawMatch("target")
 	if !ok || lineIdx != 1 {
 		t.Fatalf("expected line 1 match, got idx=%d ok=%v", lineIdx, ok)
+	}
+	lineIdx, ok = ui.findRawMatchFrom("target", 2, false)
+	if !ok || lineIdx != 1 {
+		t.Fatalf("expected backward match to line 1, got idx=%d ok=%v", lineIdx, ok)
+	}
+
+	ui.rawText = "TARGET one\nline2\nTARGET two"
+	ui.detailRaw.SetText(ui.rawText)
+	ui.detailRaw.ScrollTo(2, 0)
+	lineIdx, ok = ui.findRawMatch("target")
+	if !ok || lineIdx != 0 {
+		t.Fatalf("expected wrapped forward match to line 0, got idx=%d ok=%v", lineIdx, ok)
+	}
+	ui.rawQuery = "target"
+	ui.detailRaw.ScrollTo(0, 0)
+	ui.repeatRawSearch(false)
+	row, _ := ui.detailRaw.GetScrollOffset()
+	if row != 2 {
+		t.Fatalf("expected wrapped backward repeat to line 2, got row=%d", row)
+	}
+
+	ui.rawText = "count and count again\nline2"
+	ui.detailRaw.SetText(ui.rawText)
+	ui.rawQuery = "count"
+	ui.rawMatchLine = 0
+	ui.rawMatchOcc = 0
+	ui.repeatRawSearch(true)
+	if ui.rawMatchLine != 0 || ui.rawMatchOcc != 1 {
+		t.Fatalf("expected next occurrence on same line (0,1), got (%d,%d)", ui.rawMatchLine, ui.rawMatchOcc)
+	}
+	ui.repeatRawSearch(true)
+	if ui.rawMatchLine != 0 || ui.rawMatchOcc != 0 {
+		t.Fatalf("expected wrapped forward occurrence to (0,0), got (%d,%d)", ui.rawMatchLine, ui.rawMatchOcc)
 	}
 }
 
