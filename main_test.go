@@ -1216,6 +1216,9 @@ func TestRandomManualTablesGeneration(t *testing.T) {
 	if !strings.Contains(equipBody, "1d12 Equipment Shop Table") {
 		t.Fatalf("expected equipment shop table section, got: %q", equipBody)
 	}
+	if !strings.Contains(strings.ToLower(equipBody), "owners:") || !strings.Contains(equipBody, "%") {
+		t.Fatalf("expected owners and price oscillation in equipment table, got: %q", equipBody)
+	}
 	magicBody := strings.TrimSpace(asString(ui.randoms[2].Raw["content"]))
 	if !strings.Contains(magicBody, "1d12 Magic Shop Table") {
 		t.Fatalf("expected magic shop table section, got: %q", magicBody)

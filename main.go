@@ -4973,6 +4973,43 @@ func simpleTitleCase(s string) string {
 	return strings.Join(parts, " ")
 }
 
+func randomShopOwners() string {
+	if len(randomNPCNames) == 0 {
+		return "Unknown"
+	}
+	first := strings.TrimSpace(randomNPCNames[rand.Intn(len(randomNPCNames))])
+	if len(randomNPCNames) < 2 || rand.Intn(100) < 60 {
+		return first
+	}
+	second := first
+	for second == first {
+		second = strings.TrimSpace(randomNPCNames[rand.Intn(len(randomNPCNames))])
+	}
+	return first + ", " + second
+}
+
+func formatPriceWithOscillation(raw map[string]any, percent int) string {
+	base := formatItemBasePrice(raw)
+	if strings.TrimSpace(base) == "" {
+		if percent == 0 {
+			return "n/a"
+		}
+		return fmt.Sprintf("n/a (%+d%%)", percent)
+	}
+	baseCp, ok := anyToInt64(raw["value"])
+	if !ok || baseCp <= 0 {
+		if percent == 0 {
+			return base
+		}
+		return fmt.Sprintf("%s (%+d%%)", base, percent)
+	}
+	finalCp := int64(math.Round(float64(baseCp) * (100.0 + float64(percent)) / 100.0))
+	if finalCp < 1 {
+		finalCp = 1
+	}
+	return fmt.Sprintf("%s -> %s (%+d%%)", base, formatCopperValue(finalCp), percent)
+}
+
 func (ui *UI) openRandomMonsterEncounterTableForm() {
 	if len(ui.monsters) == 0 {
 		ui.status.SetText(fmt.Sprintf(" [white:red] random[-:-] no monsters available  %s", helpText))
@@ -5231,11 +5268,14 @@ func (ui *UI) generateRandomEquipmentShopTable() {
 		"",
 		"1d12 Equipment Shop Table",
 	}
+	priceSwing := []int{-20, -10, 0, 10, 20, 30, 50}
 	for i, it := range equipmentRows {
 		src := blankIfEmpty(strings.TrimSpace(it.Source), "n/a")
 		typ := blankIfEmpty(strings.TrimSpace(it.Type), "gear")
 		shopName := fmt.Sprintf("%s %s", shopAdj[i%len(shopAdj)], shopNoun[rand.Intn(len(shopNoun))])
-		lines = append(lines, fmt.Sprintf("%2d. %s - featured: %s (%s, %s)", i+1, shopName, it.Name, typ, src))
+		owners := randomShopOwners()
+		price := formatPriceWithOscillation(it.Raw, priceSwing[rand.Intn(len(priceSwing))])
+		lines = append(lines, fmt.Sprintf("%2d. %s - owners: %s - featured: %s (%s, %s) - price: %s", i+1, shopName, owners, it.Name, typ, src, price))
 	}
 	ui.addRandomEntry("Settlement Tables", "Equipment Shop Table", strings.Join(lines, "\n"))
 }
