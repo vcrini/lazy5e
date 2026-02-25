@@ -4111,6 +4111,7 @@ func (ui *UI) renderDetailByMonsterIndex(monsterIndex int) {
 	fmt.Fprintf(builder, "[yellow]%s[-]\n", m.Name)
 	fmt.Fprintf(builder, "[white]Source:[-] %s\n", blankIfEmpty(m.Source, "n/a"))
 	fmt.Fprintf(builder, "[white]Type:[-] %s\n", blankIfEmpty(m.Type, "n/a"))
+	fmt.Fprintf(builder, "[white]Size:[-] %s\n", blankIfEmpty(extractMonsterSize(m.Raw["size"]), "n/a"))
 	if hasScale {
 		fmt.Fprintf(builder, "[white]CR:[-] %s -> %s (%+d)\n", blankIfEmpty(scalePreview.BaseCR, "n/a"), scalePreview.TargetCR, scalePreview.Step)
 	} else {
@@ -4803,6 +4804,9 @@ func buildMonsterDescriptionText(m Monster) string {
 	}
 	if t := strings.TrimSpace(m.Type); t != "" {
 		fmt.Fprintf(b, "Type: %s\n", t)
+	}
+	if size := strings.TrimSpace(extractMonsterSize(raw["size"])); size != "" {
+		fmt.Fprintf(b, "Size: %s\n", size)
 	}
 	if cr := strings.TrimSpace(m.CR); cr != "" {
 		fmt.Fprintf(b, "Challenge: %s\n", cr)
@@ -10923,6 +10927,34 @@ func extractRaceSize(v any) string {
 		return ""
 	}
 	return strings.Join(sz, "/")
+}
+
+func extractMonsterSize(v any) string {
+	sz := asStringSlice(v)
+	if len(sz) == 0 {
+		return ""
+	}
+	codeToName := map[string]string{
+		"T": "Tiny",
+		"S": "Small",
+		"M": "Medium",
+		"L": "Large",
+		"H": "Huge",
+		"G": "Gargantuan",
+	}
+	out := make([]string, 0, len(sz))
+	for _, s := range sz {
+		u := strings.ToUpper(strings.TrimSpace(s))
+		if u == "" {
+			continue
+		}
+		if full, ok := codeToName[u]; ok {
+			out = append(out, full)
+			continue
+		}
+		out = append(out, s)
+	}
+	return strings.Join(out, "/")
 }
 
 func extractRaceLineage(v any) string {
