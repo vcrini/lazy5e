@@ -546,6 +546,11 @@ type UI struct {
 
 	helpVisible          bool
 	helpReturnFocus      tview.Primitive
+	helpTextView         *tview.TextView
+	helpBody             string
+	helpQuery            string
+	helpMatchLine        int
+	helpMatchOcc         int
 	addCustomVisible     bool
 	charCreateVisible    bool
 	encounterEditVisible bool
@@ -990,9 +995,25 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		}
 
 		if ui.helpVisible {
+			if ui.pages.HasPage("help-search") {
+				// Let the help-search input modal handle Enter/Esc and text.
+				return event
+			}
 			if event.Key() == tcell.KeyEscape ||
 				(event.Key() == tcell.KeyRune && (event.Rune() == '?' || event.Rune() == 'q')) {
 				ui.closeHelpOverlay()
+				return nil
+			}
+			if event.Key() == tcell.KeyRune && event.Rune() == '/' {
+				ui.openHelpSearch()
+				return nil
+			}
+			if ui.app.GetFocus() == ui.helpTextView && event.Key() == tcell.KeyRune && event.Rune() == 'n' {
+				ui.repeatHelpSearch(true)
+				return nil
+			}
+			if ui.app.GetFocus() == ui.helpTextView && event.Key() == tcell.KeyRune && event.Rune() == 'N' {
+				ui.repeatHelpSearch(false)
 				return nil
 			}
 			// Let the help TextView handle scrolling keys (j/k, arrows, PgUp/PgDn).
@@ -1486,8 +1507,13 @@ func (ui *UI) openHelpOverlay(focus tview.Primitive) {
 	text.SetTitle(fmt.Sprintf(" Help - %s ", ui.panelNameForFocus(focus)))
 	text.SetText(ui.helpForFocus(focus))
 
-	helpBody := ui.helpForFocus(focus) + "\n[gray]Scroll: j/k, arrows, PgUp/PgDn[-]"
+	helpBody := ui.helpForFocus(focus) + "\n[gray]Scroll: j/k, arrows, PgUp/PgDn   Search: / then n/N[-]"
 	text.SetText(helpBody)
+	ui.helpTextView = text
+	ui.helpBody = helpBody
+	ui.helpMatchLine = -1
+	ui.helpMatchOcc = -1
+	ui.renderHelpWithHighlight("", -1, -1)
 
 	// Bigger modal so panel-specific shortcuts are not clipped on common terminal sizes.
 	modal := tview.NewFlex().
@@ -1503,8 +1529,14 @@ func (ui *UI) openHelpOverlay(focus tview.Primitive) {
 }
 
 func (ui *UI) closeHelpOverlay() {
+	ui.pages.RemovePage("help-search")
 	ui.pages.RemovePage("help-overlay")
 	ui.helpVisible = false
+	ui.helpTextView = nil
+	ui.helpBody = ""
+	ui.helpQuery = ""
+	ui.helpMatchLine = -1
+	ui.helpMatchOcc = -1
 	if ui.helpReturnFocus != nil {
 		ui.app.SetFocus(ui.helpReturnFocus)
 	} else {
@@ -1523,6 +1555,245 @@ func (ui *UI) closePanelJumpModal(apply bool) {
 		}
 	}
 	ui.panelJumpReturnFocus = nil
+}
+
+func (ui *UI) renderHelpWithHighlight(query string, lineToHighlight int, occToHighlight int) {
+	if ui.helpTextView == nil || ui.helpBody == "" {
+		return
+	}
+	lines := strings.Split(ui.helpBody, "\n")
+	var b strings.Builder
+	for i, line := range lines {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		if query != "" && i == lineToHighlight {
+			b.WriteString(highlightRawOccurrence(line, query, occToHighlight))
+		} else {
+			b.WriteString(line)
+		}
+	}
+	ui.helpTextView.SetText(b.String())
+}
+
+func highlightRawOccurrence(line, query string, occToHighlight int) string {
+	if query == "" {
+		return line
+	}
+	lowerLine := strings.ToLower(line)
+	lowerQuery := strings.ToLower(query)
+	var b strings.Builder
+	start := 0
+	occ := 0
+	for {
+		idx := strings.Index(lowerLine[start:], lowerQuery)
+		if idx < 0 {
+			b.WriteString(line[start:])
+			break
+		}
+		abs := start + idx
+		end := abs + len(query)
+		b.WriteString(line[start:abs])
+		if occToHighlight < 0 || occ == occToHighlight {
+			b.WriteString("[black:gold]")
+			b.WriteString(line[abs:end])
+			b.WriteString("[-:-]")
+		} else {
+			b.WriteString(line[abs:end])
+		}
+		start = end
+		occ++
+		if start >= len(line) {
+			break
+		}
+	}
+	return b.String()
+}
+
+func lineMatchCount(line, query string) int {
+	if query == "" {
+		return 0
+	}
+	lowerLine := strings.ToLower(line)
+	lowerQuery := strings.ToLower(query)
+	if lowerQuery == "" {
+		return 0
+	}
+	count := 0
+	start := 0
+	for {
+		idx := strings.Index(lowerLine[start:], lowerQuery)
+		if idx < 0 {
+			return count
+		}
+		count++
+		start += idx + len(query)
+		if start >= len(line) {
+			return count
+		}
+	}
+}
+
+func findNextOccurrenceInText(text string, query string, startLine int, startOcc int, forward bool) (int, int, bool) {
+	if strings.TrimSpace(query) == "" || text == "" {
+		return 0, 0, false
+	}
+	lines := strings.Split(text, "\n")
+	if len(lines) == 0 {
+		return 0, 0, false
+	}
+	if startLine < -1 {
+		startLine = -1
+	}
+	if startLine > len(lines) {
+		startLine = len(lines)
+	}
+	if startOcc < -1 {
+		startOcc = -1
+	}
+	if forward {
+		for l := max(0, startLine); l < len(lines); l++ {
+			count := lineMatchCount(lines[l], query)
+			if count == 0 {
+				continue
+			}
+			first := 0
+			if l == startLine {
+				first = startOcc + 1
+			}
+			if first < 0 {
+				first = 0
+			}
+			if first < count {
+				return l, first, true
+			}
+		}
+		for l := 0; l < len(lines); l++ {
+			count := lineMatchCount(lines[l], query)
+			if count > 0 {
+				return l, 0, true
+			}
+		}
+		return 0, 0, false
+	}
+	if startLine == len(lines) {
+		startLine = len(lines) - 1
+	}
+	for l := min(startLine, len(lines)-1); l >= 0; l-- {
+		count := lineMatchCount(lines[l], query)
+		if count == 0 {
+			continue
+		}
+		last := count - 1
+		if l == startLine && startOcc >= 0 {
+			last = startOcc - 1
+		}
+		if last >= 0 {
+			return l, last, true
+		}
+	}
+	for l := len(lines) - 1; l >= 0; l-- {
+		count := lineMatchCount(lines[l], query)
+		if count > 0 {
+			return l, count - 1, true
+		}
+	}
+	return 0, 0, false
+}
+
+func (ui *UI) openHelpSearch() {
+	if !ui.helpVisible || ui.helpTextView == nil {
+		return
+	}
+	input := tview.NewInputField().
+		SetLabel("/ ").
+		SetFieldWidth(40)
+	input.SetLabelColor(tcell.ColorGold)
+	input.SetFieldBackgroundColor(tcell.ColorWhite)
+	input.SetFieldTextColor(tcell.ColorBlack)
+	input.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	input.SetBackgroundColor(tcell.ColorBlack)
+	input.SetBorder(true)
+	input.SetTitle(" Find In Help ")
+	input.SetBorderColor(tcell.ColorGold)
+	input.SetTitleColor(tcell.ColorGold)
+	input.SetText(ui.helpQuery)
+
+	closeModal := func() {
+		ui.pages.RemovePage("help-search")
+		ui.app.SetFocus(ui.helpTextView)
+	}
+	input.SetDoneFunc(func(key tcell.Key) {
+		closeModal()
+		if key == tcell.KeyEscape || key != tcell.KeyEnter {
+			return
+		}
+		query := strings.TrimSpace(input.GetText())
+		if query == "" {
+			ui.helpQuery = ""
+			ui.helpMatchLine = -1
+			ui.helpMatchOcc = -1
+			ui.renderHelpWithHighlight("", -1, -1)
+			ui.status.SetText(helpText)
+			return
+		}
+		start, _ := ui.helpTextView.GetScrollOffset()
+		line, occ, ok := findNextOccurrenceInText(ui.helpBody, query, start, -1, true)
+		if !ok {
+			ui.helpQuery = query
+			ui.helpMatchLine = -1
+			ui.helpMatchOcc = -1
+			ui.renderHelpWithHighlight(query, -1, -1)
+			ui.status.SetText(fmt.Sprintf(" [white:red] no match in Help [-:-] \"%s\"  %s", query, helpText))
+			return
+		}
+		ui.helpQuery = query
+		ui.helpMatchLine = line
+		ui.helpMatchOcc = occ
+		ui.renderHelpWithHighlight(query, line, occ)
+		ui.helpTextView.ScrollTo(line, 0)
+		ui.status.SetText(fmt.Sprintf(" [black:gold] found in Help[-:-] \"%s\" (linea %d)  %s", query, line+1, helpText))
+	})
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(input, 3, 0, true).
+			AddItem(nil, 0, 1, false), 52, 0, true).
+		AddItem(nil, 0, 1, false)
+	ui.pages.AddPage("help-search", modal, true, true)
+	ui.app.SetFocus(input)
+}
+
+func (ui *UI) repeatHelpSearch(forward bool) {
+	query := strings.TrimSpace(ui.helpQuery)
+	if query == "" || ui.helpTextView == nil {
+		ui.status.SetText(fmt.Sprintf(" [white:red] no active search in Help [-:-]  %s", helpText))
+		return
+	}
+	startLine := ui.helpMatchLine
+	startOcc := ui.helpMatchOcc
+	if startLine < 0 {
+		startLine, _ = ui.helpTextView.GetScrollOffset()
+		startOcc = -1
+		if !forward {
+			startOcc = 0
+		}
+	}
+	line, occ, ok := findNextOccurrenceInText(ui.helpBody, query, startLine, startOcc, forward)
+	if !ok {
+		ui.helpMatchLine = -1
+		ui.helpMatchOcc = -1
+		ui.renderHelpWithHighlight(query, -1, -1)
+		ui.status.SetText(fmt.Sprintf(" [white:red] no match in Help [-:-] \"%s\"  %s", query, helpText))
+		return
+	}
+	ui.helpMatchLine = line
+	ui.helpMatchOcc = occ
+	ui.renderHelpWithHighlight(query, line, occ)
+	ui.helpTextView.ScrollTo(line, 0)
+	ui.status.SetText(fmt.Sprintf(" [black:gold] found in Help[-:-] \"%s\" (linea %d)  %s", query, line+1, helpText))
 }
 
 func (ui *UI) openPanelJumpModal(returnFocus tview.Primitive) {
