@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] G [-:-] panel jump  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] K[-:-] skill check  [black:gold] V[-:-] saving throw  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
+	helpTextBase          = " [black:gold]?[-:-] help "
 	defaultAppDirName     = ".lazy5e"
 	defaultEncountersFile = "encounters.yaml"
 	lastEncountersFile    = ".encounters_last_path"
@@ -571,7 +571,7 @@ func main() {
 			return
 		}
 	}
-	helpText = helpTextBase + fmt.Sprintf(" [black:gold] v%s [-:-]", appVersion)
+	helpText = helpTextBase
 
 	yamlPath := strings.TrimSpace(os.Getenv("MONSTERS_YAML"))
 	encountersPath := strings.TrimSpace(os.Getenv("ENCOUNTERS_YAML"))
@@ -1735,7 +1735,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  i : roll initiative for selected entry\n" +
 			"  I : roll initiative for all entries\n" +
 			"  K : roll a skill check (editable bonus)\n" +
-			"  V : roll a saving throw (editable bonus)\n" +
+			"  V : roll a saving throw vs DC (save type + bonus + DC)\n" +
 			"  S : sort entries by initiative roll\n" +
 			"  * : toggle turn mode\n" +
 			"  n / p : next / previous turn\n" +
@@ -12610,7 +12610,7 @@ func (ui *UI) openEncounterSkillCheckModal() {
 	bonusField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyEnter:
-			rollNow()
+			form.SetFocus(2)
 			return nil
 		case tcell.KeyTab:
 			form.SetFocus(2)
@@ -12674,6 +12674,12 @@ func (ui *UI) openEncounterSaveCheckModal() {
 	bonusField.SetFieldBackgroundColor(tcell.ColorWhite)
 	bonusField.SetFieldTextColor(tcell.ColorBlack)
 	bonusField.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	dcField := tview.NewInputField().SetLabel("DC: ").SetFieldWidth(8)
+	dcField.SetLabelColor(tcell.ColorGold)
+	dcField.SetFieldBackgroundColor(tcell.ColorWhite)
+	dcField.SetFieldTextColor(tcell.ColorBlack)
+	dcField.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	dcField.SetText("15")
 
 	fillBonus := func(save string) {
 		if b, ok := ui.encounterSaveBonus(entry, save); ok {
@@ -12698,33 +12704,48 @@ func (ui *UI) openEncounterSaveCheckModal() {
 	form.SetBackgroundColor(tcell.ColorBlack)
 	form.AddFormItem(saveDrop)
 	form.AddFormItem(bonusField)
+	form.AddFormItem(dcField)
 
 	closeModal := func() {
 		ui.pages.RemovePage("encounter-save-check")
 		ui.saveCheckVisible = false
 		ui.app.SetFocus(ui.encounter)
 	}
-	rollNow := func() {
-		_, save := saveDrop.GetCurrentOption()
-		bonusText := strings.TrimSpace(bonusField.GetText())
-		if bonusText == "" {
-			bonusText = "0"
+		rollNow := func() {
+			_, save := saveDrop.GetCurrentOption()
+			bonusText := strings.TrimSpace(bonusField.GetText())
+			if bonusText == "" {
+				bonusText = "0"
 		}
 		bonus, err := strconv.Atoi(bonusText)
-		if err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] invalid save bonus[-:-] \"%s\"  %s", bonusText, helpText))
-			return
+			if err != nil {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid save bonus[-:-] \"%s\"  %s", bonusText, helpText))
+				return
+			}
+			dcText := strings.TrimSpace(dcField.GetText())
+			if dcText == "" {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+				return
+			}
+			dc, err := strconv.Atoi(dcText)
+			if err != nil || dc < 0 {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+				return
+			}
+			roll := rand.Intn(20) + 1
+			total := roll + bonus
+			sign := "+"
+			if bonus < 0 {
+				sign = ""
+			}
+			outcome := "ko"
+			if total >= dc {
+				outcome = "ok"
+			}
+			ui.status.SetText(fmt.Sprintf(" [black:gold] save[-:-] %s %s vs DC %d: d20(%d) %s%d = %d (%s)  %s",
+				ui.encounterEntryDisplay(entry), save, dc, roll, sign, bonus, total, outcome, helpText))
+			closeModal()
 		}
-		roll := rand.Intn(20) + 1
-		total := roll + bonus
-		sign := "+"
-		if bonus < 0 {
-			sign = ""
-		}
-		ui.status.SetText(fmt.Sprintf(" [black:gold] save[-:-] %s %s d20(%d) %s%d = %d  %s",
-			ui.encounterEntryDisplay(entry), save, roll, sign, bonus, total, helpText))
-		closeModal()
-	}
 
 	form.AddButton("Roll", rollNow)
 	form.AddButton("Cancel", closeModal)
@@ -12744,7 +12765,7 @@ func (ui *UI) openEncounterSaveCheckModal() {
 			form.SetFocus(1)
 			return nil
 		case tcell.KeyBacktab:
-			form.SetFocus(3)
+			form.SetFocus(4)
 			return nil
 		case tcell.KeyEnter:
 			if !saveDrop.IsOpen() {
@@ -12772,13 +12793,35 @@ func (ui *UI) openEncounterSaveCheckModal() {
 	bonusField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyEnter:
-			rollNow()
+			form.SetFocus(2)
 			return nil
 		case tcell.KeyTab:
 			form.SetFocus(2)
 			return nil
 		case tcell.KeyBacktab:
 			form.SetFocus(0)
+			return nil
+		case tcell.KeyEscape:
+			closeModal()
+			return nil
+		default:
+			if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+				closeModal()
+				return nil
+			}
+				return event
+			}
+		})
+	dcField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEnter:
+			rollNow()
+			return nil
+		case tcell.KeyTab:
+			form.SetFocus(3)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(1)
 			return nil
 		case tcell.KeyEscape:
 			closeModal()
@@ -12796,7 +12839,7 @@ func (ui *UI) openEncounterSaveCheckModal() {
 		AddItem(nil, 0, 1, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 			AddItem(nil, 0, 1, false).
-			AddItem(form, 10, 0, true).
+			AddItem(form, 12, 0, true).
 			AddItem(nil, 0, 1, false), 56, 0, true).
 		AddItem(nil, 0, 1, false)
 
