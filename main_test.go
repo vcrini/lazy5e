@@ -1225,6 +1225,185 @@ func TestRandomManualTablesGeneration(t *testing.T) {
 	}
 }
 
+func TestCharactersNameFilterMatchesClassFeatures(t *testing.T) {
+	tmp := t.TempDir()
+	classes := []Monster{
+		{
+			ID:          1,
+			Name:        "Sorcerer",
+			Source:      "XPHB",
+			CR:          "d6",
+			Environment: []string{"CHA"},
+			Type:        "full",
+			Raw: map[string]any{
+				"classFeatures": []any{
+					"Spellcasting|Sorcerer|XPHB|1",
+					"classFeature: Tides of Chaos|Sorcerer|XPHB|3",
+				},
+			},
+		},
+	}
+	ui := newUI(nil, nil, nil, classes, nil, nil, nil, nil, nil, nil, nil, filepath.Join(tmp, "encounters.yaml"), filepath.Join(tmp, "dice.yaml"), filepath.Join(tmp, "random.yaml"))
+	ui.setBrowseMode(BrowseCharacters)
+	ui.nameFilter = "tides of chaos"
+	ui.applyFilters()
+	if len(ui.filtered) != 1 {
+		t.Fatalf("expected class feature name filter to match character class, got %d results", len(ui.filtered))
+	}
+	got := buildClassDescriptionText(classes[0])
+	if !strings.Contains(got, "Class Features") || !strings.Contains(got, "Tides of Chaos") {
+		t.Fatalf("expected class feature list in class description, got: %q", got)
+	}
+}
+
+func TestExtractSubclassFeatureNames(t *testing.T) {
+	raw := map[string]any{
+		"__subclassFeatures": []any{
+			"Tides of Chaos",
+			"subclassFeature: Wild Magic Surge|Sorcerer|XPHB|Wild Magic|XPHB|3",
+			"Tides of Chaos",
+		},
+	}
+	got := extractSubclassFeatureNames(raw)
+	if !reflect.DeepEqual(got, []string{"Tides of Chaos", "Wild Magic Surge"}) {
+		t.Fatalf("unexpected subclass features: %#v", got)
+	}
+}
+
+func TestCharactersNameFilterMatchesSubclassFeatures(t *testing.T) {
+	tmp := t.TempDir()
+	classes := []Monster{
+		{
+			ID:          1,
+			Name:        "Sorcerer",
+			Source:      "XPHB",
+			CR:          "d6",
+			Environment: []string{"CHA"},
+			Type:        "full",
+			Raw: map[string]any{
+				"__subclassFeatures": []any{"Tides of Chaos", "Wild Magic Surge"},
+				"__subclassFeatureDetails": []map[string]any{
+					{
+						"feature":       "Tides of Chaos",
+						"level":         3,
+						"subclass_name": "Wild Magic",
+						"entries":       []any{"You can manipulate chaos to gain advantage on one d20 test."},
+					},
+				},
+			},
+		},
+	}
+	ui := newUI(nil, nil, nil, classes, nil, nil, nil, nil, nil, nil, nil, filepath.Join(tmp, "encounters.yaml"), filepath.Join(tmp, "dice.yaml"), filepath.Join(tmp, "random.yaml"))
+	ui.setBrowseMode(BrowseCharacters)
+	ui.nameFilter = "tides of chaos"
+	ui.applyFilters()
+	if len(ui.filtered) != 1 {
+		t.Fatalf("expected subclass feature name filter to match character class, got %d results", len(ui.filtered))
+	}
+	got := buildClassDescriptionText(classes[0])
+	if !strings.Contains(got, "Subclass Features") || !strings.Contains(got, "Tides of Chaos") {
+		t.Fatalf("expected subclass feature list in class description, got: %q", got)
+	}
+	if !strings.Contains(got, "Subclass Feature Details") || !strings.Contains(got, "gain advantage on one d20 test") {
+		t.Fatalf("expected subclass feature details in class description, got: %q", got)
+	}
+}
+
+func TestLoadClassFeatureDetailsIndexFromYAML(t *testing.T) {
+	yml := `class_features:
+  - class_name: Sorcerer
+    class_source: XPHB
+    feature: Spellcasting
+    level: 1
+    entries:
+      - You cast spells.
+subclass_features:
+  - class_name: Sorcerer
+    class_source: XPHB
+    subclass_name: Wild Magic
+    subclass_source: XPHB
+    feature: Tides of Chaos
+    level: 3
+    entries:
+      - Gain advantage once.
+`
+	classIdx, subIdx := loadClassFeatureDetailsIndexFromYAML([]byte(yml))
+	key := classFeatureIndexKey("Sorcerer", "XPHB")
+	if len(classIdx[key]) != 1 {
+		t.Fatalf("expected one class detail row, got %d", len(classIdx[key]))
+	}
+	if got := asString(classIdx[key][0]["feature"]); got != "Spellcasting" {
+		t.Fatalf("unexpected class feature name: %q", got)
+	}
+	if len(subIdx[key]) != 1 {
+		t.Fatalf("expected one subclass detail row, got %d", len(subIdx[key]))
+	}
+	if got := asString(subIdx[key][0]["feature"]); got != "Tides of Chaos" {
+		t.Fatalf("unexpected subclass feature name: %q", got)
+	}
+}
+
+func TestPlainSectionKeepsNestedEntriesMultiline(t *testing.T) {
+	in := []any{
+		map[string]any{
+			"name": "Feature A",
+			"entries": []any{
+				"First line.",
+				map[string]any{
+					"type": "entries",
+					"name": "Sub",
+					"entries": []any{
+						"Nested one.",
+						"Nested two.",
+					},
+				},
+			},
+		},
+	}
+	got := plainSection(in)
+	if !strings.Contains(got, "Feature A.") {
+		t.Fatalf("expected feature header, got: %q", got)
+	}
+	if !strings.Contains(got, "\n") {
+		t.Fatalf("expected multiline rendering for nested entries, got: %q", got)
+	}
+	if strings.Contains(got, "Nested one., Nested two.") {
+		t.Fatalf("expected nested entries not collapsed into comma-joined line, got: %q", got)
+	}
+}
+
+func TestSearchDraconicInEmbeddedSorcererDescription(t *testing.T) {
+	classes, _, _, _, err := loadClassesFromBytes(embeddedClassesYAML)
+	if err != nil {
+		t.Fatalf("loadClassesFromBytes error: %v", err)
+	}
+	var sorcerer *Monster
+	for i := range classes {
+		if strings.EqualFold(strings.TrimSpace(classes[i].Name), "Sorcerer") {
+			c := classes[i]
+			sorcerer = &c
+			break
+		}
+	}
+	if sorcerer == nil {
+		t.Fatal("sorcerer not found in embedded classes")
+	}
+	desc := strings.ToLower(buildClassDescriptionText(*sorcerer))
+	if !strings.Contains(desc, "draconic") {
+		t.Fatalf("expected sorcerer description to contain draconic, got prefix: %q", desc[:min(len(desc), 400)])
+	}
+
+	ui := makeCharacterUI(t)
+	ui.rawText = buildClassDescriptionText(*sorcerer)
+	line, occ, ok := ui.findNextRawOccurrence("draconic", 0, -1, true)
+	if !ok {
+		t.Fatal("expected to find first occurrence of draconic")
+	}
+	if line < 0 || occ < 0 {
+		t.Fatalf("invalid match coordinates line=%d occ=%d", line, occ)
+	}
+}
+
 func TestEncounterConditionsBadgeAndRoundProgress(t *testing.T) {
 	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
 	ui.encounterItems = []EncounterEntry{
@@ -2079,9 +2258,8 @@ func TestHighlightEscapedAndFindRawMatch(t *testing.T) {
 	ui.rawQuery = "target"
 	ui.detailRaw.ScrollTo(0, 0)
 	ui.repeatRawSearch(false)
-	row, _ := ui.detailRaw.GetScrollOffset()
-	if row != 2 {
-		t.Fatalf("expected wrapped backward repeat to line 2, got row=%d", row)
+	if ui.rawMatchLine != 2 || ui.rawMatchOcc != 0 {
+		t.Fatalf("expected wrapped backward repeat to match (2,0), got (%d,%d)", ui.rawMatchLine, ui.rawMatchOcc)
 	}
 
 	ui.rawText = "count and count again\nline2"

@@ -66,6 +66,12 @@ var embeddedSpellsYAML []byte
 //go:embed data/class.yaml
 var embeddedClassesYAML []byte
 
+//go:embed data/subclass.yaml
+var embeddedSubclassesYAML []byte
+
+//go:embed data/class_feature_details.yaml
+var embeddedClassFeatureDetailsYAML []byte
+
 //go:embed data/race.yaml
 var embeddedRacesYAML []byte
 
@@ -116,6 +122,44 @@ type spellsDataset struct {
 
 type classesDataset struct {
 	Classes []map[string]any `yaml:"classes"`
+}
+
+type subclassesDataset struct {
+	Features []subclassFeatureRecord `yaml:"features"`
+}
+
+type subclassFeatureRecord struct {
+	ClassName      string `yaml:"class_name"`
+	ClassSource    string `yaml:"class_source"`
+	SubclassName   string `yaml:"subclass_name"`
+	SubclassSource string `yaml:"subclass_source"`
+	Feature        string `yaml:"feature"`
+	Level          int    `yaml:"level"`
+}
+
+type classFeatureDetailsDataset struct {
+	ClassFeatures    []classFeatureDetailRecord    `yaml:"class_features"`
+	SubclassFeatures []subclassFeatureDetailRecord `yaml:"subclass_features"`
+}
+
+type classFeatureDetailRecord struct {
+	ClassName   string `yaml:"class_name"`
+	ClassSource string `yaml:"class_source"`
+	Feature     string `yaml:"feature"`
+	Source      string `yaml:"source"`
+	Level       int    `yaml:"level"`
+	Entries     any    `yaml:"entries"`
+}
+
+type subclassFeatureDetailRecord struct {
+	ClassName      string `yaml:"class_name"`
+	ClassSource    string `yaml:"class_source"`
+	SubclassName   string `yaml:"subclass_name"`
+	SubclassSource string `yaml:"subclass_source"`
+	Feature        string `yaml:"feature"`
+	Source         string `yaml:"source"`
+	Level          int    `yaml:"level"`
+	Entries        any    `yaml:"entries"`
 }
 
 type racesDataset struct {
@@ -899,7 +943,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	ui.detailRaw = tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true).
-		SetWordWrap(false)
+		SetRegions(true).
+		SetWrap(true).
+		SetWordWrap(true)
 	ui.detailRaw.SetBorder(true)
 	ui.detailRaw.SetTitle(" [3]-Description ")
 	ui.detailRaw.SetTitleColor(tcell.ColorGold)
@@ -4355,7 +4401,7 @@ func (ui *UI) applyFilters() {
 	ui.filtered = ui.filtered[:0]
 
 	for i, m := range ui.activeEntries() {
-		if !matchName(m.Name, ui.nameFilter) {
+		if !ui.matchesNameFilterByMode(m) {
 			continue
 		}
 		if !matchCR(m.CR, ui.crFilter) {
@@ -4374,6 +4420,30 @@ func (ui *UI) applyFilters() {
 	}
 
 	ui.renderList()
+}
+
+func (ui *UI) matchesNameFilterByMode(entry Monster) bool {
+	query := strings.TrimSpace(ui.nameFilter)
+	if query == "" {
+		return true
+	}
+	if matchName(entry.Name, query) {
+		return true
+	}
+	if ui.browseMode != BrowseCharacters {
+		return false
+	}
+	for _, feature := range extractClassFeatureNames(entry.Raw) {
+		if matchName(feature, query) {
+			return true
+		}
+	}
+	for _, feature := range extractSubclassFeatureNames(entry.Raw) {
+		if matchName(feature, query) {
+			return true
+		}
+	}
+	return false
 }
 
 func (ui *UI) renderList() {
@@ -5947,7 +6017,133 @@ func buildClassDescriptionText(cl Monster) string {
 	if mc := manualText(raw["multiclassing"]); strings.TrimSpace(mc) != "" {
 		fmt.Fprintf(b, "\nMulticlassing\n%s\n", mc)
 	}
+	if features := extractClassFeatureNames(raw); len(features) > 0 {
+		fmt.Fprintf(b, "\nClass Features\n%s\n", strings.Join(features, "\n"))
+	}
+	if features := extractSubclassFeatureNames(raw); len(features) > 0 {
+		fmt.Fprintf(b, "\nSubclass Features\n%s\n", strings.Join(features, "\n"))
+	}
+	if details := renderClassFeatureDetails(raw["__classFeatureDetails"], false); details != "" {
+		fmt.Fprintf(b, "\nClass Feature Details\n%s\n", details)
+	}
+	if details := renderClassFeatureDetails(raw["__subclassFeatureDetails"], true); details != "" {
+		fmt.Fprintf(b, "\nSubclass Feature Details\n%s\n", details)
+	}
 	return strings.TrimSpace(b.String())
+}
+
+func renderClassFeatureDetails(v any, includeSubclass bool) string {
+	items, ok := v.([]map[string]any)
+	if !ok || len(items) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(items)*3)
+	for _, it := range items {
+		name := strings.TrimSpace(asString(it["feature"]))
+		if name == "" {
+			continue
+		}
+		level, _ := anyToInt(it["level"])
+		header := name
+		if level > 0 {
+			header = fmt.Sprintf("Lv %d - %s", level, name)
+		}
+		if includeSubclass {
+			sub := strings.TrimSpace(asString(it["subclass_name"]))
+			if sub != "" {
+				header = fmt.Sprintf("%s [%s]", header, sub)
+			}
+		}
+		lines = append(lines, header)
+		if body := strings.TrimSpace(manualSection(it["entries"])); body != "" {
+			lines = append(lines, body)
+		}
+		lines = append(lines, "")
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func extractClassFeatureNames(raw map[string]any) []string {
+	if raw == nil {
+		return nil
+	}
+	val, ok := raw["classFeatures"]
+	if !ok || val == nil {
+		return nil
+	}
+	items, ok := val.([]any)
+	if !ok || len(items) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, it := range items {
+		s := strings.TrimSpace(asString(it))
+		if s == "" {
+			continue
+		}
+		name := featureNameFromToken(s)
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
+func extractSubclassFeatureNames(raw map[string]any) []string {
+	if raw == nil {
+		return nil
+	}
+	val, ok := raw["__subclassFeatures"]
+	if !ok || val == nil {
+		return nil
+	}
+	var items []any
+	switch x := val.(type) {
+	case []any:
+		items = x
+	case []string:
+		items = make([]any, 0, len(x))
+		for _, s := range x {
+			items = append(items, s)
+		}
+	default:
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, it := range items {
+		name := featureNameFromToken(strings.TrimSpace(asString(it)))
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
+func featureNameFromToken(s string) string {
+	name := strings.TrimSpace(s)
+	if name == "" {
+		return ""
+	}
+	if idx := strings.Index(name, "|"); idx >= 0 {
+		name = strings.TrimSpace(name[:idx])
+	}
+	name = strings.TrimSpace(strings.TrimPrefix(name, "classFeature:"))
+	name = strings.TrimSpace(strings.TrimPrefix(name, "subclassFeature:"))
+	return name
 }
 
 func buildRaceDescriptionText(rc Monster) string {
@@ -7464,7 +7660,13 @@ func plainSection(v any) string {
 		switch x := it.(type) {
 		case map[string]any:
 			name := strings.TrimSpace(asString(x["name"]))
-			body := strings.TrimSpace(plainAny(x["entries"]))
+			body := ""
+			switch entries := x["entries"].(type) {
+			case []any:
+				body = strings.TrimSpace(plainSection(entries))
+			default:
+				body = strings.TrimSpace(plainAny(entries))
+			}
 			if name != "" && body != "" {
 				lines = append(lines, fmt.Sprintf("%s. %s", name, body))
 			} else if name != "" {
@@ -7564,8 +7766,7 @@ func (ui *UI) openRawSearch(returnFocus tview.Primitive) {
 			ui.status.SetText(helpText)
 			return
 		}
-		start, _ := ui.detailRaw.GetScrollOffset()
-		line, occ, ok := ui.findNextRawOccurrence(query, start, -1, true)
+		line, occ, ok := ui.findNextRawOccurrence(query, -1, -1, true)
 		if !ok {
 			ui.rawQuery = query
 			ui.rawMatchLine = -1
@@ -7578,7 +7779,7 @@ func (ui *UI) openRawSearch(returnFocus tview.Primitive) {
 		ui.rawMatchLine = line
 		ui.rawMatchOcc = occ
 		ui.renderRawWithHighlightOccurrence(query, line, occ)
-		ui.detailRaw.ScrollTo(line, 0)
+		ui.detailRaw.ScrollToHighlight()
 		ui.status.SetText(ui.rawSearchFoundStatus(query, line, occ))
 	})
 
@@ -7613,7 +7814,7 @@ func (ui *UI) repeatRawSearch(forward bool) {
 	ui.rawMatchLine = line
 	ui.rawMatchOcc = occ
 	ui.renderRawWithHighlightOccurrence(query, line, occ)
-	ui.detailRaw.ScrollTo(line, 0)
+	ui.detailRaw.ScrollToHighlight()
 	ui.status.SetText(ui.rawSearchFoundStatus(query, line, occ))
 }
 
@@ -11087,12 +11288,17 @@ func (ui *UI) renderRawWithHighlightOccurrence(query string, lineToHighlight int
 			b.WriteByte('\n')
 		}
 		if query != "" && i == lineToHighlight {
-			b.WriteString(highlightEscapedOccurrence(line, query, occToHighlight))
+			b.WriteString(highlightEscapedOccurrenceWithRegion(line, query, occToHighlight, "rawmatch"))
 		} else {
 			b.WriteString(tview.Escape(line))
 		}
 	}
 	ui.detailRaw.SetText(b.String())
+	if query != "" && lineToHighlight >= 0 && occToHighlight >= 0 {
+		ui.detailRaw.Highlight("rawmatch")
+	} else {
+		ui.detailRaw.Highlight()
+	}
 }
 
 func highlightEscaped(line, query string) string {
@@ -11100,6 +11306,10 @@ func highlightEscaped(line, query string) string {
 }
 
 func highlightEscapedOccurrence(line, query string, occToHighlight int) string {
+	return highlightEscapedOccurrenceWithRegion(line, query, occToHighlight, "")
+}
+
+func highlightEscapedOccurrenceWithRegion(line, query string, occToHighlight int, regionID string) string {
 	if query == "" {
 		return tview.Escape(line)
 	}
@@ -11119,9 +11329,17 @@ func highlightEscapedOccurrence(line, query string, occToHighlight int) string {
 		end := abs + len(query)
 		b.WriteString(tview.Escape(line[start:abs]))
 		if occToHighlight < 0 || occ == occToHighlight {
+			if occ == occToHighlight && regionID != "" {
+				b.WriteString("[\"")
+				b.WriteString(regionID)
+				b.WriteString("\"]")
+			}
 			b.WriteString("[black:gold]")
 			b.WriteString(tview.Escape(line[abs:end]))
 			b.WriteString("[-:-]")
+			if occ == occToHighlight && regionID != "" {
+				b.WriteString("[\"\"]")
+			}
 		} else {
 			b.WriteString(tview.Escape(line[abs:end]))
 		}
@@ -11473,6 +11691,8 @@ func loadClassesFromBytes(b []byte) ([]Monster, []string, []string, []string, er
 	primarySet := map[string]struct{}{}
 	hdSet := map[string]struct{}{}
 	casterSet := map[string]struct{}{}
+	subclassFeaturesByClass := loadSubclassFeatureIndexFromYAML(embeddedSubclassesYAML)
+	classFeatureDetailsByClass, subclassFeatureDetailsByClass := loadClassFeatureDetailsIndexFromYAML(embeddedClassFeatureDetailsYAML)
 
 	for i, raw := range ds.Classes {
 		name := strings.TrimSpace(asString(raw["name"]))
@@ -11491,6 +11711,37 @@ func loadClassesFromBytes(b []byte) ([]Monster, []string, []string, []string, er
 		hdSet[hitDie] = struct{}{}
 		caster := extractClassCaster(raw["casterProgression"])
 		casterSet[caster] = struct{}{}
+		classKey := classFeatureIndexKey(name, source)
+		if features := subclassFeaturesByClass[classKey]; len(features) > 0 {
+			raw["__subclassFeatures"] = append([]string(nil), features...)
+		}
+		if details := classFeatureDetailsByClass[classKey]; len(details) > 0 {
+			raw["__classFeatureDetails"] = cloneAnySlice(details)
+		}
+		if details := subclassFeatureDetailsByClass[classKey]; len(details) > 0 {
+			raw["__subclassFeatureDetails"] = cloneAnySlice(details)
+			existingNames := asStringSlice(raw["__subclassFeatures"])
+			if len(existingNames) == 0 {
+				// Keep a lightweight name list for quick search.
+				names := make([]string, 0, len(details))
+				seen := map[string]struct{}{}
+				for _, d := range details {
+					n := strings.TrimSpace(asString(d["feature"]))
+					if n == "" {
+						continue
+					}
+					k := strings.ToLower(n)
+					if _, ok := seen[k]; ok {
+						continue
+					}
+					seen[k] = struct{}{}
+					names = append(names, n)
+				}
+				if len(names) > 0 {
+					raw["__subclassFeatures"] = names
+				}
+			}
+		}
 
 		classes = append(classes, Monster{
 			ID:          i,
@@ -11509,6 +11760,147 @@ func loadClassesFromBytes(b []byte) ([]Monster, []string, []string, []string, er
 		return li < lj
 	})
 	return classes, keysSorted(primarySet), keysSorted(hdSet), keysSorted(casterSet), nil
+}
+
+func cloneAnySlice(items []map[string]any) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, it := range items {
+		cp := make(map[string]any, len(it))
+		for k, v := range it {
+			cp[k] = v
+		}
+		out = append(out, cp)
+	}
+	return out
+}
+
+func classFeatureIndexKey(className string, classSource string) string {
+	return strings.ToLower(strings.TrimSpace(className)) + "|" + strings.ToLower(strings.TrimSpace(classSource))
+}
+
+func loadSubclassFeatureIndexFromYAML(b []byte) map[string][]string {
+	if len(b) == 0 {
+		return nil
+	}
+	var ds subclassesDataset
+	if err := yaml.Unmarshal(b, &ds); err != nil {
+		return nil
+	}
+	index := map[string][]string{}
+	for _, sf := range ds.Features {
+		className := strings.TrimSpace(sf.ClassName)
+		classSource := strings.TrimSpace(sf.ClassSource)
+		featureName := strings.TrimSpace(sf.Feature)
+		if className == "" || classSource == "" || featureName == "" {
+			continue
+		}
+		key := classFeatureIndexKey(className, classSource)
+		index[key] = append(index[key], featureName)
+	}
+	for key, names := range index {
+		seen := map[string]struct{}{}
+		out := make([]string, 0, len(names))
+		for _, name := range names {
+			n := strings.TrimSpace(name)
+			if n == "" {
+				continue
+			}
+			k := strings.ToLower(n)
+			if _, ok := seen[k]; ok {
+				continue
+			}
+			seen[k] = struct{}{}
+			out = append(out, n)
+		}
+		sort.Strings(out)
+		index[key] = out
+	}
+	return index
+}
+
+func loadClassFeatureDetailsIndexFromYAML(b []byte) (map[string][]map[string]any, map[string][]map[string]any) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+	var ds classFeatureDetailsDataset
+	if err := yaml.Unmarshal(b, &ds); err != nil {
+		return nil, nil
+	}
+	classIdx := map[string][]map[string]any{}
+	subclassIdx := map[string][]map[string]any{}
+	for _, cf := range ds.ClassFeatures {
+		className := strings.TrimSpace(cf.ClassName)
+		classSource := strings.TrimSpace(cf.ClassSource)
+		feature := strings.TrimSpace(cf.Feature)
+		if className == "" || classSource == "" || feature == "" {
+			continue
+		}
+		key := classFeatureIndexKey(className, classSource)
+		classIdx[key] = append(classIdx[key], map[string]any{
+			"feature": feature,
+			"source":  strings.TrimSpace(cf.Source),
+			"level":   cf.Level,
+			"entries": cf.Entries,
+		})
+	}
+	for _, sf := range ds.SubclassFeatures {
+		className := strings.TrimSpace(sf.ClassName)
+		classSource := strings.TrimSpace(sf.ClassSource)
+		feature := strings.TrimSpace(sf.Feature)
+		if className == "" || classSource == "" || feature == "" {
+			continue
+		}
+		key := classFeatureIndexKey(className, classSource)
+		subclassIdx[key] = append(subclassIdx[key], map[string]any{
+			"subclass_name":   strings.TrimSpace(sf.SubclassName),
+			"subclass_source": strings.TrimSpace(sf.SubclassSource),
+			"feature":         feature,
+			"source":          strings.TrimSpace(sf.Source),
+			"level":           sf.Level,
+			"entries":         sf.Entries,
+		})
+	}
+	less := func(a, b map[string]any) bool {
+		al, _ := anyToInt(a["level"])
+		bl, _ := anyToInt(b["level"])
+		if al != bl {
+			return al < bl
+		}
+		as := strings.ToLower(strings.TrimSpace(asString(a["subclass_name"])))
+		bs := strings.ToLower(strings.TrimSpace(asString(b["subclass_name"])))
+		if as != bs {
+			return as < bs
+		}
+		af := strings.ToLower(strings.TrimSpace(asString(a["feature"])))
+		bf := strings.ToLower(strings.TrimSpace(asString(b["feature"])))
+		return af < bf
+	}
+	for k, items := range classIdx {
+		sort.Slice(items, func(i, j int) bool { return less(items[i], items[j]) })
+		classIdx[k] = dedupeFeatureDetailRows(items)
+	}
+	for k, items := range subclassIdx {
+		sort.Slice(items, func(i, j int) bool { return less(items[i], items[j]) })
+		subclassIdx[k] = dedupeFeatureDetailRows(items)
+	}
+	return classIdx, subclassIdx
+}
+
+func dedupeFeatureDetailRows(items []map[string]any) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, it := range items {
+		name := strings.ToLower(strings.TrimSpace(asString(it["feature"])))
+		level, _ := anyToInt(it["level"])
+		sub := strings.ToLower(strings.TrimSpace(asString(it["subclass_name"])))
+		key := fmt.Sprintf("%s|%s|%d", sub, name, level)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, it)
+	}
+	return out
 }
 
 func extractClassHitDie(v any) string {

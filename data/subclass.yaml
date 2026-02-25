@@ -1,0 +1,919 @@
+features:
+  - class_name: Barbarian
+    class_source: PHB
+    subclass_name: Berserker
+    subclass_source: PHB
+    feature: Frenzy
+    level: 3
+  - class_name: Barbarian
+    class_source: PHB
+    subclass_name: Berserker
+    subclass_source: PHB
+    feature: Path of the Berserker
+    level: 3
+  - class_name: Barbarian
+    class_source: PHB
+    subclass_name: Berserker
+    subclass_source: PHB
+    feature: Mindless Rage
+    level: 6
+  - class_name: Barbarian
+    class_source: PHB
+    subclass_name: Berserker
+    subclass_source: PHB
+    feature: Intimidating Presence
+    level: 10
+  - class_name: Barbarian
+    class_source: PHB
+    subclass_name: Berserker
+    subclass_source: PHB
+    feature: Retaliation
+    level: 14
+  - class_name: Barbarian
+    class_source: XPHB
+    subclass_name: Berserker
+    subclass_source: XPHB
+    feature: Frenzy
+    level: 3
+  - class_name: Barbarian
+    class_source: XPHB
+    subclass_name: Berserker
+    subclass_source: XPHB
+    feature: Path of the Berserker
+    level: 3
+  - class_name: Barbarian
+    class_source: XPHB
+    subclass_name: Berserker
+    subclass_source: XPHB
+    feature: Mindless Rage
+    level: 6
+  - class_name: Barbarian
+    class_source: XPHB
+    subclass_name: Berserker
+    subclass_source: XPHB
+    feature: Retaliation
+    level: 10
+  - class_name: Barbarian
+    class_source: XPHB
+    subclass_name: Berserker
+    subclass_source: XPHB
+    feature: Intimidating Presence
+    level: 14
+  - class_name: Bard
+    class_source: PHB
+    subclass_name: Lore
+    subclass_source: PHB
+    feature: Bonus Proficiencies
+    level: 3
+  - class_name: Bard
+    class_source: PHB
+    subclass_name: Lore
+    subclass_source: PHB
+    feature: College of Lore
+    level: 3
+  - class_name: Bard
+    class_source: PHB
+    subclass_name: Lore
+    subclass_source: PHB
+    feature: Cutting Words
+    level: 3
+  - class_name: Bard
+    class_source: PHB
+    subclass_name: Lore
+    subclass_source: PHB
+    feature: Additional Magical Secrets
+    level: 6
+  - class_name: Bard
+    class_source: PHB
+    subclass_name: Lore
+    subclass_source: PHB
+    feature: Peerless Skill
+    level: 14
+  - class_name: Bard
+    class_source: XPHB
+    subclass_name: Lore
+    subclass_source: XPHB
+    feature: Bonus Proficiencies
+    level: 3
+  - class_name: Bard
+    class_source: XPHB
+    subclass_name: Lore
+    subclass_source: XPHB
+    feature: College of Lore
+    level: 3
+  - class_name: Bard
+    class_source: XPHB
+    subclass_name: Lore
+    subclass_source: XPHB
+    feature: Cutting Words
+    level: 3
+  - class_name: Bard
+    class_source: XPHB
+    subclass_name: Lore
+    subclass_source: XPHB
+    feature: Magical Discoveries
+    level: 6
+  - class_name: Bard
+    class_source: XPHB
+    subclass_name: Lore
+    subclass_source: XPHB
+    feature: Peerless Skill
+    level: 14
+  - class_name: Cleric
+    class_source: PHB
+    subclass_name: Life
+    subclass_source: PHB
+    feature: Bonus Proficiency
+    level: 1
+  - class_name: Cleric
+    class_source: PHB
+    subclass_name: Life
+    subclass_source: PHB
+    feature: Disciple of Life
+    level: 1
+  - class_name: Cleric
+    class_source: PHB
+    subclass_name: Life
+    subclass_source: PHB
+    feature: Life Domain
+    level: 1
+  - class_name: Cleric
+    class_source: PHB
+    subclass_name: Life
+    subclass_source: PHB
+    feature: 'Channel Divinity: Preserve Life'
+    level: 2
+  - class_name: Cleric
+    class_source: PHB
+    subclass_name: Life
+    subclass_source: PHB
+    feature: Blessed Healer
+    level: 6
+  - class_name: Cleric
+    class_source: PHB
+    subclass_name: Life
+    subclass_source: PHB
+    feature: Divine Strike
+    level: 8
+  - class_name: Cleric
+    class_source: PHB
+    subclass_name: Life
+    subclass_source: PHB
+    feature: Supreme Healing
+    level: 17
+  - class_name: Cleric
+    class_source: XPHB
+    subclass_name: Life
+    subclass_source: XPHB
+    feature: Disciple of Life
+    level: 3
+  - class_name: Cleric
+    class_source: XPHB
+    subclass_name: Life
+    subclass_source: XPHB
+    feature: Life Domain
+    level: 3
+  - class_name: Cleric
+    class_source: XPHB
+    subclass_name: Life
+    subclass_source: XPHB
+    feature: Life Domain Spells
+    level: 3
+  - class_name: Cleric
+    class_source: XPHB
+    subclass_name: Life
+    subclass_source: XPHB
+    feature: Preserve Life
+    level: 3
+  - class_name: Cleric
+    class_source: XPHB
+    subclass_name: Life
+    subclass_source: XPHB
+    feature: Blessed Healer
+    level: 6
+  - class_name: Cleric
+    class_source: XPHB
+    subclass_name: Life
+    subclass_source: XPHB
+    feature: Supreme Healing
+    level: 17
+  - class_name: Druid
+    class_source: PHB
+    subclass_name: Land
+    subclass_source: PHB
+    feature: Bonus Cantrip
+    level: 2
+  - class_name: Druid
+    class_source: PHB
+    subclass_name: Land
+    subclass_source: PHB
+    feature: Circle of the Land
+    level: 2
+  - class_name: Druid
+    class_source: PHB
+    subclass_name: Land
+    subclass_source: PHB
+    feature: Circle Spells
+    level: 2
+  - class_name: Druid
+    class_source: PHB
+    subclass_name: Land
+    subclass_source: PHB
+    feature: Natural Recovery
+    level: 2
+  - class_name: Druid
+    class_source: PHB
+    subclass_name: Land
+    subclass_source: PHB
+    feature: Land's Stride
+    level: 6
+  - class_name: Druid
+    class_source: PHB
+    subclass_name: Land
+    subclass_source: PHB
+    feature: Nature's Ward
+    level: 10
+  - class_name: Druid
+    class_source: PHB
+    subclass_name: Land
+    subclass_source: PHB
+    feature: Nature's Sanctuary
+    level: 14
+  - class_name: Druid
+    class_source: XPHB
+    subclass_name: Land
+    subclass_source: XPHB
+    feature: Circle of the Land
+    level: 3
+  - class_name: Druid
+    class_source: XPHB
+    subclass_name: Land
+    subclass_source: XPHB
+    feature: Circle of the Land Spells
+    level: 3
+  - class_name: Druid
+    class_source: XPHB
+    subclass_name: Land
+    subclass_source: XPHB
+    feature: Land's Aid
+    level: 3
+  - class_name: Druid
+    class_source: XPHB
+    subclass_name: Land
+    subclass_source: XPHB
+    feature: Natural Recovery
+    level: 6
+  - class_name: Druid
+    class_source: XPHB
+    subclass_name: Land
+    subclass_source: XPHB
+    feature: Nature's Ward
+    level: 10
+  - class_name: Druid
+    class_source: XPHB
+    subclass_name: Land
+    subclass_source: XPHB
+    feature: Nature's Sanctuary
+    level: 14
+  - class_name: Fighter
+    class_source: PHB
+    subclass_name: Champion
+    subclass_source: PHB
+    feature: Champion
+    level: 3
+  - class_name: Fighter
+    class_source: PHB
+    subclass_name: Champion
+    subclass_source: PHB
+    feature: Improved Critical
+    level: 3
+  - class_name: Fighter
+    class_source: PHB
+    subclass_name: Champion
+    subclass_source: PHB
+    feature: Remarkable Athlete
+    level: 7
+  - class_name: Fighter
+    class_source: PHB
+    subclass_name: Champion
+    subclass_source: PHB
+    feature: Additional Fighting Style
+    level: 10
+  - class_name: Fighter
+    class_source: PHB
+    subclass_name: Champion
+    subclass_source: PHB
+    feature: Superior Critical
+    level: 15
+  - class_name: Fighter
+    class_source: PHB
+    subclass_name: Champion
+    subclass_source: PHB
+    feature: Survivor
+    level: 18
+  - class_name: Fighter
+    class_source: XPHB
+    subclass_name: Champion
+    subclass_source: XPHB
+    feature: Champion
+    level: 3
+  - class_name: Fighter
+    class_source: XPHB
+    subclass_name: Champion
+    subclass_source: XPHB
+    feature: Improved Critical
+    level: 3
+  - class_name: Fighter
+    class_source: XPHB
+    subclass_name: Champion
+    subclass_source: XPHB
+    feature: Remarkable Athlete
+    level: 3
+  - class_name: Fighter
+    class_source: XPHB
+    subclass_name: Champion
+    subclass_source: XPHB
+    feature: Additional Fighting Style
+    level: 7
+  - class_name: Fighter
+    class_source: XPHB
+    subclass_name: Champion
+    subclass_source: XPHB
+    feature: Heroic Warrior
+    level: 10
+  - class_name: Fighter
+    class_source: XPHB
+    subclass_name: Champion
+    subclass_source: XPHB
+    feature: Superior Critical
+    level: 15
+  - class_name: Fighter
+    class_source: XPHB
+    subclass_name: Champion
+    subclass_source: XPHB
+    feature: Survivor
+    level: 18
+  - class_name: Monk
+    class_source: PHB
+    subclass_name: Open Hand
+    subclass_source: PHB
+    feature: Open Hand Technique
+    level: 3
+  - class_name: Monk
+    class_source: PHB
+    subclass_name: Open Hand
+    subclass_source: PHB
+    feature: Way of the Open Hand
+    level: 3
+  - class_name: Monk
+    class_source: PHB
+    subclass_name: Open Hand
+    subclass_source: PHB
+    feature: Wholeness of Body
+    level: 6
+  - class_name: Monk
+    class_source: PHB
+    subclass_name: Open Hand
+    subclass_source: PHB
+    feature: Tranquility
+    level: 11
+  - class_name: Monk
+    class_source: PHB
+    subclass_name: Open Hand
+    subclass_source: PHB
+    feature: Quivering Palm
+    level: 17
+  - class_name: Monk
+    class_source: XPHB
+    subclass_name: Open Hand
+    subclass_source: XPHB
+    feature: Open Hand Technique
+    level: 3
+  - class_name: Monk
+    class_source: XPHB
+    subclass_name: Open Hand
+    subclass_source: XPHB
+    feature: Warrior of the Open Hand
+    level: 3
+  - class_name: Monk
+    class_source: XPHB
+    subclass_name: Open Hand
+    subclass_source: XPHB
+    feature: Wholeness of Body
+    level: 6
+  - class_name: Monk
+    class_source: XPHB
+    subclass_name: Open Hand
+    subclass_source: XPHB
+    feature: Fleet Step
+    level: 11
+  - class_name: Monk
+    class_source: XPHB
+    subclass_name: Open Hand
+    subclass_source: XPHB
+    feature: Quivering Palm
+    level: 17
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Channel Divinity
+    level: 3
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Oath of Devotion
+    level: 3
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Oath Spells
+    level: 3
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Sacred Weapon
+    level: 3
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Tenets of Devotion
+    level: 3
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Turn the Unholy
+    level: 3
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Aura of Devotion
+    level: 7
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Purity of Spirit
+    level: 15
+  - class_name: Paladin
+    class_source: PHB
+    subclass_name: Devotion
+    subclass_source: PHB
+    feature: Holy Nimbus
+    level: 20
+  - class_name: Paladin
+    class_source: XPHB
+    subclass_name: Devotion
+    subclass_source: XPHB
+    feature: Oath of Devotion
+    level: 3
+  - class_name: Paladin
+    class_source: XPHB
+    subclass_name: Devotion
+    subclass_source: XPHB
+    feature: Oath of Devotion Spells
+    level: 3
+  - class_name: Paladin
+    class_source: XPHB
+    subclass_name: Devotion
+    subclass_source: XPHB
+    feature: Sacred Weapon
+    level: 3
+  - class_name: Paladin
+    class_source: XPHB
+    subclass_name: Devotion
+    subclass_source: XPHB
+    feature: Aura of Devotion
+    level: 7
+  - class_name: Paladin
+    class_source: XPHB
+    subclass_name: Devotion
+    subclass_source: XPHB
+    feature: Smite of Protection
+    level: 15
+  - class_name: Paladin
+    class_source: XPHB
+    subclass_name: Devotion
+    subclass_source: XPHB
+    feature: Holy Nimbus
+    level: 20
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Colossus Slayer
+    level: 3
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Giant Killer
+    level: 3
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Horde Breaker
+    level: 3
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Hunter
+    level: 3
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Hunter's Prey
+    level: 3
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Defensive Tactics
+    level: 7
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Escape the Horde
+    level: 7
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Multiattack Defense
+    level: 7
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Steel Will
+    level: 7
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Multiattack
+    level: 11
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Volley
+    level: 11
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Whirlwind Attack
+    level: 11
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Evasion
+    level: 15
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Stand Against the Tide
+    level: 15
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Superior Hunter's Defense
+    level: 15
+  - class_name: Ranger
+    class_source: PHB
+    subclass_name: Hunter
+    subclass_source: PHB
+    feature: Uncanny Dodge
+    level: 15
+  - class_name: Ranger
+    class_source: XPHB
+    subclass_name: Hunter
+    subclass_source: XPHB
+    feature: Hunter
+    level: 3
+  - class_name: Ranger
+    class_source: XPHB
+    subclass_name: Hunter
+    subclass_source: XPHB
+    feature: Hunter's Lore
+    level: 3
+  - class_name: Ranger
+    class_source: XPHB
+    subclass_name: Hunter
+    subclass_source: XPHB
+    feature: Hunter's Prey
+    level: 3
+  - class_name: Ranger
+    class_source: XPHB
+    subclass_name: Hunter
+    subclass_source: XPHB
+    feature: Defensive Tactics
+    level: 7
+  - class_name: Ranger
+    class_source: XPHB
+    subclass_name: Hunter
+    subclass_source: XPHB
+    feature: Superior Hunter's Prey
+    level: 11
+  - class_name: Ranger
+    class_source: XPHB
+    subclass_name: Hunter
+    subclass_source: XPHB
+    feature: Superior Hunter's Defense
+    level: 15
+  - class_name: Rogue
+    class_source: PHB
+    subclass_name: Thief
+    subclass_source: PHB
+    feature: Fast Hands
+    level: 3
+  - class_name: Rogue
+    class_source: PHB
+    subclass_name: Thief
+    subclass_source: PHB
+    feature: Second-Story Work
+    level: 3
+  - class_name: Rogue
+    class_source: PHB
+    subclass_name: Thief
+    subclass_source: PHB
+    feature: Thief
+    level: 3
+  - class_name: Rogue
+    class_source: PHB
+    subclass_name: Thief
+    subclass_source: PHB
+    feature: Supreme Sneak
+    level: 9
+  - class_name: Rogue
+    class_source: PHB
+    subclass_name: Thief
+    subclass_source: PHB
+    feature: Use Magic Device
+    level: 13
+  - class_name: Rogue
+    class_source: PHB
+    subclass_name: Thief
+    subclass_source: PHB
+    feature: Thief's Reflexes
+    level: 17
+  - class_name: Rogue
+    class_source: XPHB
+    subclass_name: Thief
+    subclass_source: XPHB
+    feature: Fast Hands
+    level: 3
+  - class_name: Rogue
+    class_source: XPHB
+    subclass_name: Thief
+    subclass_source: XPHB
+    feature: Second-Story Work
+    level: 3
+  - class_name: Rogue
+    class_source: XPHB
+    subclass_name: Thief
+    subclass_source: XPHB
+    feature: Thief
+    level: 3
+  - class_name: Rogue
+    class_source: XPHB
+    subclass_name: Thief
+    subclass_source: XPHB
+    feature: Supreme Sneak
+    level: 9
+  - class_name: Rogue
+    class_source: XPHB
+    subclass_name: Thief
+    subclass_source: XPHB
+    feature: Use Magic Device
+    level: 13
+  - class_name: Rogue
+    class_source: XPHB
+    subclass_name: Thief
+    subclass_source: XPHB
+    feature: Thief's Reflexes
+    level: 17
+  - class_name: Sorcerer
+    class_source: PHB
+    subclass_name: Draconic
+    subclass_source: PHB
+    feature: Draconic Bloodline
+    level: 1
+  - class_name: Sorcerer
+    class_source: PHB
+    subclass_name: Draconic
+    subclass_source: PHB
+    feature: Draconic Resilience
+    level: 1
+  - class_name: Sorcerer
+    class_source: PHB
+    subclass_name: Draconic
+    subclass_source: PHB
+    feature: Dragon Ancestor
+    level: 1
+  - class_name: Sorcerer
+    class_source: PHB
+    subclass_name: Draconic
+    subclass_source: PHB
+    feature: Elemental Affinity
+    level: 6
+  - class_name: Sorcerer
+    class_source: PHB
+    subclass_name: Draconic
+    subclass_source: PHB
+    feature: Dragon Wings
+    level: 14
+  - class_name: Sorcerer
+    class_source: PHB
+    subclass_name: Draconic
+    subclass_source: PHB
+    feature: Draconic Presence
+    level: 18
+  - class_name: Sorcerer
+    class_source: XPHB
+    subclass_name: Draconic
+    subclass_source: XPHB
+    feature: Draconic Resilience
+    level: 3
+  - class_name: Sorcerer
+    class_source: XPHB
+    subclass_name: Draconic
+    subclass_source: XPHB
+    feature: Draconic Sorcery
+    level: 3
+  - class_name: Sorcerer
+    class_source: XPHB
+    subclass_name: Draconic
+    subclass_source: XPHB
+    feature: Draconic Spells
+    level: 3
+  - class_name: Sorcerer
+    class_source: XPHB
+    subclass_name: Draconic
+    subclass_source: XPHB
+    feature: Elemental Affinity
+    level: 6
+  - class_name: Sorcerer
+    class_source: XPHB
+    subclass_name: Draconic
+    subclass_source: XPHB
+    feature: Dragon Wings
+    level: 14
+  - class_name: Sorcerer
+    class_source: XPHB
+    subclass_name: Draconic
+    subclass_source: XPHB
+    feature: Dragon Companion
+    level: 18
+  - class_name: Warlock
+    class_source: PHB
+    subclass_name: Fiend
+    subclass_source: PHB
+    feature: Dark One's Blessing
+    level: 1
+  - class_name: Warlock
+    class_source: PHB
+    subclass_name: Fiend
+    subclass_source: PHB
+    feature: The Fiend
+    level: 1
+  - class_name: Warlock
+    class_source: PHB
+    subclass_name: Fiend
+    subclass_source: PHB
+    feature: Dark One's Own Luck
+    level: 6
+  - class_name: Warlock
+    class_source: PHB
+    subclass_name: Fiend
+    subclass_source: PHB
+    feature: Fiendish Resilience
+    level: 10
+  - class_name: Warlock
+    class_source: PHB
+    subclass_name: Fiend
+    subclass_source: PHB
+    feature: Hurl Through Hell
+    level: 14
+  - class_name: Warlock
+    class_source: XPHB
+    subclass_name: Fiend
+    subclass_source: XPHB
+    feature: Dark One's Blessing
+    level: 3
+  - class_name: Warlock
+    class_source: XPHB
+    subclass_name: Fiend
+    subclass_source: XPHB
+    feature: Fiend Patron
+    level: 3
+  - class_name: Warlock
+    class_source: XPHB
+    subclass_name: Fiend
+    subclass_source: XPHB
+    feature: Fiend Spells
+    level: 3
+  - class_name: Warlock
+    class_source: XPHB
+    subclass_name: Fiend
+    subclass_source: XPHB
+    feature: Dark One's Own Luck
+    level: 6
+  - class_name: Warlock
+    class_source: XPHB
+    subclass_name: Fiend
+    subclass_source: XPHB
+    feature: Fiendish Resilience
+    level: 10
+  - class_name: Warlock
+    class_source: XPHB
+    subclass_name: Fiend
+    subclass_source: XPHB
+    feature: Hurl Through Hell
+    level: 14
+  - class_name: Wizard
+    class_source: PHB
+    subclass_name: Evocation
+    subclass_source: PHB
+    feature: Evocation Savant
+    level: 2
+  - class_name: Wizard
+    class_source: PHB
+    subclass_name: Evocation
+    subclass_source: PHB
+    feature: School of Evocation
+    level: 2
+  - class_name: Wizard
+    class_source: PHB
+    subclass_name: Evocation
+    subclass_source: PHB
+    feature: Sculpt Spells
+    level: 2
+  - class_name: Wizard
+    class_source: PHB
+    subclass_name: Evocation
+    subclass_source: PHB
+    feature: Potent Cantrip
+    level: 6
+  - class_name: Wizard
+    class_source: PHB
+    subclass_name: Evocation
+    subclass_source: PHB
+    feature: Empowered Evocation
+    level: 10
+  - class_name: Wizard
+    class_source: PHB
+    subclass_name: Evocation
+    subclass_source: PHB
+    feature: Overchannel
+    level: 14
+  - class_name: Wizard
+    class_source: XPHB
+    subclass_name: Evoker
+    subclass_source: XPHB
+    feature: Evocation Savant
+    level: 3
+  - class_name: Wizard
+    class_source: XPHB
+    subclass_name: Evoker
+    subclass_source: XPHB
+    feature: Evoker
+    level: 3
+  - class_name: Wizard
+    class_source: XPHB
+    subclass_name: Evoker
+    subclass_source: XPHB
+    feature: Potent Cantrip
+    level: 3
+  - class_name: Wizard
+    class_source: XPHB
+    subclass_name: Evoker
+    subclass_source: XPHB
+    feature: Sculpt Spells
+    level: 6
+  - class_name: Wizard
+    class_source: XPHB
+    subclass_name: Evoker
+    subclass_source: XPHB
+    feature: Empowered Evocation
+    level: 10
+  - class_name: Wizard
+    class_source: XPHB
+    subclass_name: Evoker
+    subclass_source: XPHB
+    feature: Overchannel
+    level: 14
