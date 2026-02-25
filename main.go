@@ -566,6 +566,7 @@ type UI struct {
 	saveCheckVisible     bool
 	panelJumpVisible     bool
 	panelJumpReturnFocus tview.Primitive
+	diceGotoPending      bool
 }
 
 func main() {
@@ -985,6 +986,37 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	ui.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		focus := ui.app.GetFocus()
 		_, focusIsInputField := focus.(*tview.InputField)
+		if focus != ui.dice {
+			ui.diceGotoPending = false
+		}
+
+		if focus == ui.dice && ui.diceGotoPending {
+			switch event.Key() {
+			case tcell.KeyEscape:
+				ui.diceGotoPending = false
+				ui.status.SetText(helpText)
+				return nil
+			case tcell.KeyRune:
+				r := event.Rune()
+				ui.diceGotoPending = false
+				switch {
+				case r >= '1' && r <= '9':
+					ui.gotoDiceRow(int(r - '0'))
+					return nil
+				case r == '$':
+					ui.gotoLastDiceRow()
+					return nil
+				case r == '^':
+					ui.gotoDiceRow(1)
+					return nil
+				default:
+					return event
+				}
+			default:
+				ui.diceGotoPending = false
+				return event
+			}
+		}
 
 		if ui.addCustomVisible && event.Key() == tcell.KeyTab {
 			return tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone)
@@ -1075,6 +1107,10 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			return nil
 		case focus == ui.dice && event.Key() == tcell.KeyRune && event.Rune() == 'l':
 			ui.openDiceLoadInput()
+			return nil
+		case focus == ui.dice && event.Key() == tcell.KeyRune && event.Rune() == 'g':
+			ui.diceGotoPending = true
+			ui.status.SetText(fmt.Sprintf(" [black:gold]dice goto[-:-] g# row, g$ last, g^ first (g1 alias)  %s", helpText))
 			return nil
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == 'f':
 			ui.toggleFullscreenForFocus(focus)
@@ -1962,15 +1998,16 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		"  b / v / z : Manuals / Adventures / Random\n\n"
 
 	switch focus {
-	case ui.dice:
-		return header +
-			"[black:gold]Dice[-:-]\n" +
-			"  a : roll dice expression (e.g. 2d6+d20+1)\n" +
-			"  Enter : re-roll selected row\n" +
-			"  A : re-roll all rows in history\n" +
-			"  e : edit + re-roll selected row\n" +
-			"  d : delete selected row\n" +
-			"  c : clear all rows\n" +
+		case ui.dice:
+			return header +
+				"[black:gold]Dice[-:-]\n" +
+				"  a : roll dice expression (e.g. 2d6+d20+1)\n" +
+				"  Enter : re-roll selected row\n" +
+				"  g# / g$ / g^ : goto row # / last row / first row (g1 alias)\n" +
+				"  A : re-roll all rows in history\n" +
+				"  e : edit + re-roll selected row\n" +
+				"  d : delete selected row\n" +
+				"  c : clear all rows\n" +
 			"  s : save dice results (save as)\n" +
 			"  l : load dice results (load)\n" +
 			"  f : fullscreen on/off Dice panel\n" +
@@ -3147,6 +3184,29 @@ func (ui *UI) rerollAllDiceResults() {
 	}
 	ui.renderDiceList()
 	ui.status.SetText(fmt.Sprintf(" [black:gold]dice[-:-] all rerolled (%d ok, %d errors)  %s", okCount, errCount, helpText))
+}
+
+func (ui *UI) gotoDiceRow(row1Based int) {
+	if len(ui.diceLog) == 0 {
+		ui.status.SetText(fmt.Sprintf(" [white:red] no dice row available[-:-]  %s", helpText))
+		return
+	}
+	if row1Based < 1 {
+		row1Based = 1
+	}
+	if row1Based > len(ui.diceLog) {
+		row1Based = len(ui.diceLog)
+	}
+	ui.dice.SetCurrentItem(row1Based - 1)
+	ui.status.SetText(fmt.Sprintf(" [black:gold]dice goto[-:-] row %d/%d  %s", row1Based, len(ui.diceLog), helpText))
+}
+
+func (ui *UI) gotoLastDiceRow() {
+	if len(ui.diceLog) == 0 {
+		ui.status.SetText(fmt.Sprintf(" [white:red] no dice row available[-:-]  %s", helpText))
+		return
+	}
+	ui.gotoDiceRow(len(ui.diceLog))
 }
 
 func (ui *UI) appendDiceLog(entry DiceResult) {

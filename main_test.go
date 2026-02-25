@@ -1934,6 +1934,47 @@ func TestPanelJumpModalShortcutSelectsBrowsePanel(t *testing.T) {
 	}
 }
 
+func TestDiceGotoShortcuts(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
+	ui.diceLog = []DiceResult{
+		{Expression: "1d1", Output: "1"},
+		{Expression: "2d1", Output: "2"},
+		{Expression: "3d1", Output: "3"},
+	}
+	ui.renderDiceList()
+	ui.app.SetFocus(ui.dice)
+
+	capture := ui.app.GetInputCapture()
+	if capture == nil {
+		t.Fatal("expected global input capture to be configured")
+	}
+
+	capture(tcell.NewEventKey(tcell.KeyRune, 'g', tcell.ModNone))
+	capture(tcell.NewEventKey(tcell.KeyRune, '2', tcell.ModNone))
+	if got := ui.dice.GetCurrentItem(); got != 1 {
+		t.Fatalf("expected g2 to go to row index 1, got %d", got)
+	}
+
+	capture(tcell.NewEventKey(tcell.KeyRune, 'g', tcell.ModNone))
+	capture(tcell.NewEventKey(tcell.KeyRune, '$', tcell.ModNone))
+	if got := ui.dice.GetCurrentItem(); got != 2 {
+		t.Fatalf("expected g$ to go to last row index 2, got %d", got)
+	}
+
+	capture(tcell.NewEventKey(tcell.KeyRune, 'g', tcell.ModNone))
+	capture(tcell.NewEventKey(tcell.KeyRune, '^', tcell.ModNone))
+	if got := ui.dice.GetCurrentItem(); got != 0 {
+		t.Fatalf("expected g^ to go to first row index 0, got %d", got)
+	}
+
+	ui.dice.SetCurrentItem(2)
+	capture(tcell.NewEventKey(tcell.KeyRune, 'g', tcell.ModNone))
+	capture(tcell.NewEventKey(tcell.KeyRune, '1', tcell.ModNone))
+	if got := ui.dice.GetCurrentItem(); got != 0 {
+		t.Fatalf("expected g1 alias to go to first row index 0, got %d", got)
+	}
+}
+
 func TestHighlightEscapedAndFindRawMatch(t *testing.T) {
 	line := `"name": "Aarakocra"`
 	h := highlightEscaped(line, "Aarakocra")
