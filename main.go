@@ -6641,7 +6641,7 @@ func (ui *UI) openRawSearch(returnFocus tview.Primitive) {
 		ui.rawMatchOcc = occ
 		ui.renderRawWithHighlightOccurrence(query, line, occ)
 		ui.detailRaw.ScrollTo(line, 0)
-		ui.status.SetText(fmt.Sprintf(" [black:gold] trovato nella Description[-:-] \"%s\" (riga %d)  %s", query, line+1, helpText))
+		ui.status.SetText(ui.rawSearchFoundStatus(query, line, occ))
 	})
 
 	ui.pages.AddPage("raw-search", modal, true, true)
@@ -6676,7 +6676,37 @@ func (ui *UI) repeatRawSearch(forward bool) {
 	ui.rawMatchOcc = occ
 	ui.renderRawWithHighlightOccurrence(query, line, occ)
 	ui.detailRaw.ScrollTo(line, 0)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] trovato nella Description[-:-] \"%s\" (riga %d)  %s", query, line+1, helpText))
+	ui.status.SetText(ui.rawSearchFoundStatus(query, line, occ))
+}
+
+func (ui *UI) rawSearchCounter(query string, line, occ int) (int, int, bool) {
+	if strings.TrimSpace(query) == "" || ui.rawText == "" {
+		return 0, 0, false
+	}
+	lines := strings.Split(ui.rawText, "\n")
+	total := 0
+	current := 0
+	for i, row := range lines {
+		count := rawLineMatchCount(row, query)
+		if count <= 0 {
+			continue
+		}
+		if i == line && occ >= 0 && occ < count {
+			current = total + occ + 1
+		}
+		total += count
+	}
+	if total <= 0 || current <= 0 {
+		return 0, total, false
+	}
+	return current, total, true
+}
+
+func (ui *UI) rawSearchFoundStatus(query string, line, occ int) string {
+	if cur, total, ok := ui.rawSearchCounter(query, line, occ); ok {
+		return fmt.Sprintf(" [black:gold] trovato nella Description[-:-] \"%s\" (riga %d, match %d/%d)  %s", query, line+1, cur, total, helpText)
+	}
+	return fmt.Sprintf(" [black:gold] trovato nella Description[-:-] \"%s\" (riga %d)  %s", query, line+1, helpText)
 }
 
 func (ui *UI) openEncounterSaveAsInput() {

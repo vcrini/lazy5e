@@ -1919,6 +1919,10 @@ func TestHighlightEscapedAndFindRawMatch(t *testing.T) {
 	if ui.rawMatchLine != 0 || ui.rawMatchOcc != 1 {
 		t.Fatalf("expected next occurrence on same line (0,1), got (%d,%d)", ui.rawMatchLine, ui.rawMatchOcc)
 	}
+	status := ui.status.GetText(false)
+	if !strings.Contains(status, "match 2/2") {
+		t.Fatalf("expected status to include match counter 2/2, got %q", status)
+	}
 	ui.repeatRawSearch(true)
 	if ui.rawMatchLine != 0 || ui.rawMatchOcc != 0 {
 		t.Fatalf("expected wrapped forward occurrence to (0,0), got (%d,%d)", ui.rawMatchLine, ui.rawMatchOcc)
