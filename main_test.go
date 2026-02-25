@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 )
 
 func mkMonster(id int, name string, dex int, hpAvg int, hpFormula string) Monster {
@@ -1873,6 +1874,45 @@ func TestGlobalInputCaptureTurnsTabIntoEnterWhileAddCustomVisible(t *testing.T) 
 	ev = capture(tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone))
 	if ev != nil {
 		t.Fatalf("expected tab to be consumed by focus navigation when add custom mode is off, got %#v", ev)
+	}
+}
+
+func TestPanelJumpModalShortcutSelectsBrowsePanel(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
+	capture := ui.app.GetInputCapture()
+	if capture == nil {
+		t.Fatal("expected global input capture to be configured")
+	}
+
+	ev := capture(tcell.NewEventKey(tcell.KeyRune, 'G', tcell.ModNone))
+	if ev != nil {
+		t.Fatalf("expected G to be consumed, got %#v", ev)
+	}
+	if !ui.panelJumpVisible {
+		t.Fatal("expected panel jump modal to be visible")
+	}
+	if !ui.pages.HasPage("panel-jump") {
+		t.Fatal("expected panel-jump page to exist")
+	}
+
+	list, ok := ui.app.GetFocus().(*tview.List)
+	if !ok {
+		t.Fatalf("expected focus on panel jump list, got %T", ui.app.GetFocus())
+	}
+	listCapture := list.GetInputCapture()
+	if listCapture == nil {
+		t.Fatal("expected panel jump list input capture")
+	}
+	listCapture(tcell.NewEventKey(tcell.KeyRune, '5', tcell.ModNone))
+
+	if ui.panelJumpVisible {
+		t.Fatal("expected panel jump modal to close after selection")
+	}
+	if ui.browseMode != BrowseItems {
+		t.Fatalf("expected browse mode Items, got %v", ui.browseMode)
+	}
+	if ui.app.GetFocus() != ui.list {
+		t.Fatalf("expected focus on browse list, got %T", ui.app.GetFocus())
 	}
 }
 

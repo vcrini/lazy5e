@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] K[-:-] skill check  [black:gold] V[-:-] saving throw  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
+	helpTextBase          = " [black:gold] q [-:-] quit  [black:gold] / [-:-] search (Name/Description)  [black:gold] tab [-:-] focus  [black:gold] 0/1/2/3 [-:-] panels  [black:gold] [/] [-:-] cycle browse  [black:gold] 4..9[-:-] direct browse  [black:gold] G [-:-] panel jump  [black:gold] a[-:-] roll Dice  [black:gold] f[-:-] fullscreen panel  [black:gold] j/k [-:-] navigate  [black:gold] x[-:-] clear filters  [black:gold] e[-:-] edit char encounter  [black:gold] w/o[-:-] save/load build  [black:gold] d [-:-] del encounter | details<->treasure  [black:gold] s/l [-:-] save/load  [black:gold] i/I [-:-] roll init one/all  [black:gold] S [-:-] sort init  [black:gold] K[-:-] skill check  [black:gold] V[-:-] saving throw  [black:gold] * [-:-] turn mode  [black:gold] n/p [-:-] next/prev turn  [black:gold] u/r [-:-] undo/redo  [black:gold] L/H [-:-] set/clear temp HP  [black:gold] space [-:-] avg/formula HP  [black:gold] ←/→ [-:-] encounter damage/heal  [black:gold] PgUp/PgDn [-:-] scroll Description "
 	defaultAppDirName     = ".lazy5e"
 	defaultEncountersFile = "encounters.yaml"
 	lastEncountersFile    = ".encounters_last_path"
@@ -559,6 +559,8 @@ type UI struct {
 	spellTreasureVisible bool
 	skillCheckVisible    bool
 	saveCheckVisible     bool
+	panelJumpVisible     bool
+	panelJumpReturnFocus tview.Primitive
 }
 
 func main() {
@@ -996,6 +998,13 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			// Let the help TextView handle scrolling keys (j/k, arrows, PgUp/PgDn).
 			return event
 		}
+		if ui.panelJumpVisible {
+			if event.Key() == tcell.KeyEscape {
+				ui.closePanelJumpModal(false)
+				return nil
+			}
+			return event
+		}
 
 		if ui.itemTreasureVisible || ui.spellTreasureVisible {
 			if event.Key() == tcell.KeyEscape {
@@ -1018,6 +1027,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		switch {
 		case event.Key() == tcell.KeyRune && event.Rune() == '?':
 			ui.openHelpOverlay(focus)
+			return nil
+		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == 'G':
+			ui.openPanelJumpModal(focus)
 			return nil
 		case focus == ui.dice && event.Key() == tcell.KeyRune && event.Rune() == 'a':
 			ui.openDiceRollInput()
@@ -1500,6 +1512,127 @@ func (ui *UI) closeHelpOverlay() {
 	}
 }
 
+func (ui *UI) closePanelJumpModal(apply bool) {
+	ui.pages.RemovePage("panel-jump")
+	ui.panelJumpVisible = false
+	if !apply {
+		if ui.panelJumpReturnFocus != nil {
+			ui.app.SetFocus(ui.panelJumpReturnFocus)
+		} else {
+			ui.app.SetFocus(ui.list)
+		}
+	}
+	ui.panelJumpReturnFocus = nil
+}
+
+func (ui *UI) openPanelJumpModal(returnFocus tview.Primitive) {
+	type jumpTarget struct {
+		Label string
+		Key   rune
+		Hint  string
+		Go    func()
+	}
+
+	targets := []jumpTarget{
+		{Label: "Dice", Key: '0', Hint: "accanto: 1 Encounters", Go: func() { ui.app.SetFocus(ui.dice) }},
+		{Label: "Encounters", Key: '1', Hint: "accanto: 0 Dice, 2 Catalog", Go: func() { ui.app.SetFocus(ui.encounter) }},
+		{Label: "Catalog", Key: '2', Hint: "accanto: 1 Encounters, 3 Description", Go: func() { ui.app.SetFocus(ui.list) }},
+		{Label: "Description", Key: '3', Hint: "accanto: 2 Catalog", Go: func() { ui.app.SetFocus(ui.detailRaw) }},
+		{Label: "Monsters", Key: '4', Hint: "accanto: z Random, 5 Items", Go: func() { ui.setBrowseMode(BrowseMonsters); ui.app.SetFocus(ui.list) }},
+		{Label: "Items", Key: '5', Hint: "accanto: 4 Monsters, 6 Spells", Go: func() { ui.setBrowseMode(BrowseItems); ui.app.SetFocus(ui.list) }},
+		{Label: "Spells", Key: '6', Hint: "accanto: 5 Items, 7 Characters", Go: func() { ui.setBrowseMode(BrowseSpells); ui.app.SetFocus(ui.list) }},
+		{Label: "Characters", Key: '7', Hint: "accanto: 6 Spells, 8 Races", Go: func() { ui.setBrowseMode(BrowseCharacters); ui.app.SetFocus(ui.list) }},
+		{Label: "Races", Key: '8', Hint: "accanto: 7 Characters, 9 Feats", Go: func() { ui.setBrowseMode(BrowseRaces); ui.app.SetFocus(ui.list) }},
+		{Label: "Feats", Key: '9', Hint: "accanto: 8 Races, b Manuals", Go: func() { ui.setBrowseMode(BrowseFeats); ui.app.SetFocus(ui.list) }},
+		{Label: "Manuals", Key: 'b', Hint: "accanto: 9 Feats, v Adventures", Go: func() { ui.setBrowseMode(BrowseBooks); ui.app.SetFocus(ui.list) }},
+		{Label: "Adventures", Key: 'v', Hint: "accanto: b Manuals, z Random", Go: func() { ui.setBrowseMode(BrowseAdventures); ui.app.SetFocus(ui.list) }},
+		{Label: "Random", Key: 'z', Hint: "accanto: v Adventures, 4 Monsters", Go: func() { ui.setBrowseMode(BrowseRandom); ui.app.SetFocus(ui.list) }},
+	}
+
+	list := tview.NewList().
+		ShowSecondaryText(false)
+	list.SetBorder(true)
+	list.SetBorderColor(tcell.ColorGold)
+	list.SetTitleColor(tcell.ColorGold)
+	list.SetTitle(" Panel Jump ")
+	list.SetMainTextColor(tcell.ColorWhite)
+	list.SetSelectedTextColor(tcell.ColorBlack)
+	list.SetSelectedBackgroundColor(tcell.ColorGold)
+
+	detail := tview.NewTextView().
+		SetDynamicColors(true).
+		SetWrap(true).
+		SetWordWrap(true)
+	detail.SetBorder(true)
+	detail.SetBorderColor(tcell.ColorGold)
+	detail.SetTitleColor(tcell.ColorGold)
+	detail.SetTitle(" Description ")
+
+	activate := func(idx int) {
+		if idx < 0 || idx >= len(targets) {
+			return
+		}
+		ui.closePanelJumpModal(true)
+		targets[idx].Go()
+		ui.status.SetText(fmt.Sprintf(" [black:gold]panel jump[-:-] %s (%c)  %s", targets[idx].Label, targets[idx].Key, helpText))
+	}
+
+	for i := range targets {
+		t := targets[i]
+		list.AddItem(fmt.Sprintf("%s [black:gold](%c)[-:-]", t.Label, t.Key), "", 0, nil)
+	}
+	list.SetChangedFunc(func(idx int, _, _ string, _ rune) {
+		if idx < 0 || idx >= len(targets) {
+			detail.SetText("")
+			return
+		}
+		t := targets[idx]
+		detail.SetText(fmt.Sprintf("[white]Panel:[-] %s [black:gold](%c)[-:-]\n[white]Scorciatoie adiacenti:[-] %s", t.Label, t.Key, t.Hint))
+	})
+	list.SetSelectedFunc(func(idx int, _, _ string, _ rune) {
+		activate(idx)
+	})
+	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			ui.closePanelJumpModal(false)
+			return nil
+		}
+		if event.Key() == tcell.KeyRune {
+			r := event.Rune()
+			if r >= 'A' && r <= 'Z' {
+				r = r - 'A' + 'a'
+			}
+			for i := range targets {
+				if r == targets[i].Key {
+					activate(i)
+					return nil
+				}
+			}
+		}
+		return event
+	})
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(list, 16, 0, true).
+			AddItem(detail, 5, 0, false).
+			AddItem(nil, 0, 1, false), 90, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	list.SetCurrentItem(0)
+	if len(targets) > 0 {
+		t := targets[0]
+		detail.SetText(fmt.Sprintf("[white]Panel:[-] %s [black:gold](%c)[-:-]\n[white]Scorciatoie adiacenti:[-] %s", t.Label, t.Key, t.Hint))
+	}
+
+	ui.panelJumpReturnFocus = returnFocus
+	ui.panelJumpVisible = true
+	ui.pages.AddPage("panel-jump", modal, true, true)
+	ui.app.SetFocus(list)
+}
+
 func (ui *UI) panelNameForFocus(focus tview.Primitive) string {
 	switch focus {
 	case ui.dice:
@@ -1552,6 +1685,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		"  f : fullscreen on/off current panel\n" +
 		"  Tab / Shift+Tab : change focus\n" +
 		"  0 / 1 / 2 / 3 : go to Dice / Encounters / Catalog / Description\n" +
+		"  G : open panel jump modal (panel + shortcut)\n" +
 		"  [ / ] : previous/next browse panel\n" +
 		"  4 / 5 / 6 / 7 / 8 / 9 : Monsters / Items / Spells / Characters / Races / Feats\n" +
 		"  b / v / z : Manuals / Adventures / Random\n\n"
