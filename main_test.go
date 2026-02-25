@@ -1372,6 +1372,29 @@ func TestPlainSectionKeepsNestedEntriesMultiline(t *testing.T) {
 	}
 }
 
+func TestPlainSectionRendersTableRows(t *testing.T) {
+	in := []any{
+		map[string]any{
+			"caption":   "Wild Magic Surge",
+			"colLabels": []any{"d100", "Effect"},
+			"rows": []any{
+				[]any{"01-02", "Roll on this table again."},
+				[]any{"03-04", "You can see invisible creatures."},
+			},
+		},
+	}
+	got := plainSection(in)
+	if !strings.Contains(got, "Wild Magic Surge") {
+		t.Fatalf("expected table caption, got: %q", got)
+	}
+	if !strings.Contains(got, "d100 | Effect") {
+		t.Fatalf("expected table headers, got: %q", got)
+	}
+	if !strings.Contains(got, "01-02 | Roll on this table again.") {
+		t.Fatalf("expected first table row, got: %q", got)
+	}
+}
+
 func TestSearchDraconicInEmbeddedSorcererDescription(t *testing.T) {
 	classes, _, _, _, err := loadClassesFromBytes(embeddedClassesYAML)
 	if err != nil {

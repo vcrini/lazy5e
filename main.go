@@ -7659,6 +7659,10 @@ func plainSection(v any) string {
 	for _, it := range items {
 		switch x := it.(type) {
 		case map[string]any:
+			if table := plainTable(x); table != "" {
+				lines = append(lines, table)
+				continue
+			}
 			name := strings.TrimSpace(asString(x["name"]))
 			body := ""
 			switch entries := x["entries"].(type) {
@@ -7682,6 +7686,51 @@ func plainSection(v any) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func plainTable(m map[string]any) string {
+	if m == nil {
+		return ""
+	}
+	if _, hasRows := m["rows"]; !hasRows {
+		if !strings.EqualFold(strings.TrimSpace(asString(m["type"])), "table") {
+			return ""
+		}
+	}
+	lines := make([]string, 0, 8)
+	if capn := strings.TrimSpace(plainAny(m["caption"])); capn != "" {
+		lines = append(lines, capn)
+	}
+	if labels, ok := m["colLabels"].([]any); ok && len(labels) > 0 {
+		cols := make([]string, 0, len(labels))
+		for _, l := range labels {
+			col := strings.TrimSpace(plainAny(l))
+			if col == "" {
+				col = "-"
+			}
+			cols = append(cols, col)
+		}
+		lines = append(lines, strings.Join(cols, " | "))
+	}
+	if rows, ok := m["rows"].([]any); ok {
+		for _, r := range rows {
+			arr, ok := r.([]any)
+			if !ok {
+				txt := strings.TrimSpace(plainAny(r))
+				if txt != "" {
+					lines = append(lines, txt)
+				}
+				continue
+			}
+			cols := make([]string, 0, len(arr))
+			for _, c := range arr {
+				col := strings.TrimSpace(plainAny(c))
+				cols = append(cols, col)
+			}
+			lines = append(lines, strings.Join(cols, " | "))
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 func plainAny(v any) string {
