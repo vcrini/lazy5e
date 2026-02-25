@@ -554,29 +554,30 @@ type UI struct {
 	turnIndex       int
 	turnRound       int
 
-	helpVisible          bool
-	helpReturnFocus      tview.Primitive
-	helpTextView         *tview.TextView
-	helpBody             string
-	helpQuery            string
-	helpMatchLine        int
-	helpMatchOcc         int
-	addCustomVisible     bool
-	charCreateVisible    bool
-	encounterEditVisible bool
-	encounterGenVisible  bool
-	fullscreenActive     bool
-	fullscreenTarget     string
-	spellShortcutAlt     bool
-	updatingSourceDrop   bool
-	activeBottomPanel    string
-	itemTreasureVisible  bool
-	spellTreasureVisible bool
-	skillCheckVisible    bool
-	saveCheckVisible     bool
-	panelJumpVisible     bool
-	panelJumpReturnFocus tview.Primitive
-	diceGotoPending      bool
+	helpVisible                 bool
+	helpReturnFocus             tview.Primitive
+	helpTextView                *tview.TextView
+	helpBody                    string
+	helpQuery                   string
+	helpMatchLine               int
+	helpMatchOcc                int
+	addCustomVisible            bool
+	charCreateVisible           bool
+	encounterEditVisible        bool
+	encounterGenVisible         bool
+	fullscreenActive            bool
+	fullscreenTarget            string
+	spellShortcutAlt            bool
+	updatingSourceDrop          bool
+	activeBottomPanel           string
+	itemTreasureVisible         bool
+	spellTreasureVisible        bool
+	skillCheckVisible           bool
+	saveCheckVisible            bool
+	randomEncounterTableVisible bool
+	panelJumpVisible            bool
+	panelJumpReturnFocus        tview.Primitive
+	diceGotoPending             bool
 }
 
 func main() {
@@ -1087,6 +1088,10 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			// While skill check modal is open, do not process global shortcuts (1/2/3/...).
 			return event
 		}
+		if ui.randomEncounterTableVisible {
+			// While random encounter table form is open, do not process global shortcuts.
+			return event
+		}
 
 		switch {
 		case event.Key() == tcell.KeyRune && event.Rune() == '?':
@@ -1227,6 +1232,15 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			return nil
 		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'h':
 			ui.generateRandomPlotHook()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'i':
+			ui.openRandomMonsterEncounterTableForm()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'k':
+			ui.generateRandomEquipmentShopTable()
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'K':
+			ui.generateRandomMagicShopTable()
 			return nil
 		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'd':
 			ui.deleteSelectedRandomEntry()
@@ -2151,6 +2165,9 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"  u : random currency / trade bars / art objects\n" +
 				"  e : adventure event (wilderness/chase/stronghold)\n" +
 				"  h : divination / plot hook\n" +
+				"  i : random monster encounter table (choose environment + tier)\n" +
+				"  k : equipment shop table (from items dataset)\n" +
+				"  K : magic shop table (from items dataset)\n" +
 				"  d : delete selected random entry\n" +
 				"  D : clear all random entries\n" +
 				"  S : save random list as\n" +
@@ -4883,6 +4900,375 @@ func (ui *UI) generateRandomPlotHook() {
 		"Hook: investigate why every oracle in the district dreams the same fire.",
 	}
 	ui.addRandomEntry("Adventure", "Divination & Plot Hook", chooseOne(hooks))
+}
+
+func sampleRows(pool []Monster, count int) []Monster {
+	if count <= 0 || len(pool) == 0 {
+		return nil
+	}
+	out := make([]Monster, 0, count)
+	if len(pool) >= count {
+		perm := rand.Perm(len(pool))
+		for i := 0; i < count; i++ {
+			out = append(out, pool[perm[i]])
+		}
+		return out
+	}
+	out = append(out, pool...)
+	for len(out) < count {
+		out = append(out, pool[rand.Intn(len(pool))])
+	}
+	return out
+}
+
+func itemLooksMagical(it Monster) bool {
+	rarity := strings.ToLower(strings.TrimSpace(it.CR))
+	if rarity != "" && rarity != "unknown" && rarity != "none" && rarity != "mundane" {
+		return true
+	}
+	typ := strings.ToLower(strings.TrimSpace(it.Type))
+	if strings.Contains(typ, "wondrous") ||
+		strings.Contains(typ, "potion") ||
+		strings.Contains(typ, "scroll") ||
+		strings.Contains(typ, "wand") ||
+		strings.Contains(typ, "rod") ||
+		strings.Contains(typ, "ring") ||
+		strings.Contains(typ, "staff") {
+		return true
+	}
+	for _, key := range []string{"potion", "scroll", "staff", "wand", "rod", "ring", "wondrous"} {
+		if b, ok := it.Raw[key].(bool); ok && b {
+			return true
+		}
+	}
+	return false
+}
+
+func itemLooksEquipment(it Monster) bool {
+	typ := strings.ToLower(strings.TrimSpace(it.Type))
+	if strings.Contains(typ, "weapon") ||
+		strings.Contains(typ, "armor") ||
+		strings.Contains(typ, "shield") ||
+		strings.Contains(typ, "gear") ||
+		strings.Contains(typ, "tool") ||
+		strings.Contains(typ, "ammo") ||
+		strings.Contains(typ, "adventuring") {
+		return true
+	}
+	return !itemLooksMagical(it)
+}
+
+func simpleTitleCase(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return ""
+	}
+	parts := strings.Fields(s)
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(p[:1]) + p[1:]
+	}
+	return strings.Join(parts, " ")
+}
+
+func (ui *UI) openRandomMonsterEncounterTableForm() {
+	if len(ui.monsters) == 0 {
+		ui.status.SetText(fmt.Sprintf(" [white:red] random[-:-] no monsters available  %s", helpText))
+		return
+	}
+	envOptions := append([]string{"All"}, ui.collectMonsterEnvironmentOptions()...)
+	if len(envOptions) == 0 {
+		envOptions = []string{"All"}
+	}
+	tierOptions := []string{
+		"Tier 1 (CR 0-4)",
+		"Tier 2 (CR 5-10)",
+		"Tier 3 (CR 11-16)",
+		"Tier 4 (CR 17+)",
+	}
+
+	form := tview.NewForm()
+	form.SetBorder(true)
+	form.SetTitle(" Random Monster Encounter Table ")
+	form.SetBorderColor(tcell.ColorGold)
+	form.SetTitleColor(tcell.ColorGold)
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape || (event.Key() == tcell.KeyRune && event.Rune() == 'q') {
+			ui.pages.RemovePage("random-encounter-table")
+			ui.randomEncounterTableVisible = false
+			ui.app.SetFocus(ui.list)
+			return nil
+		}
+		return event
+	})
+	ui.randomEncounterTableVisible = true
+
+	envDrop := tview.NewDropDown().SetLabel("Environment: ")
+	envDrop.SetOptions(envOptions, nil)
+	envDrop.SetCurrentOption(0)
+	tierDrop := tview.NewDropDown().SetLabel("Tier: ")
+	tierDrop.SetOptions(tierOptions, nil)
+	tierDrop.SetCurrentOption(0)
+	for _, dd := range []*tview.DropDown{envDrop, tierDrop} {
+		dd.SetLabelColor(tcell.ColorGold)
+		dd.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
+		dd.SetFieldTextColor(tcell.ColorWhite)
+		dd.SetListStyles(
+			tcell.StyleDefault.Background(tcell.ColorDarkSlateGray).Foreground(tcell.ColorWhite),
+			tcell.StyleDefault.Background(tcell.ColorGold).Foreground(tcell.ColorBlack),
+		)
+	}
+
+	closeModal := func() {
+		ui.pages.RemovePage("random-encounter-table")
+		ui.randomEncounterTableVisible = false
+		ui.app.SetFocus(ui.list)
+	}
+	runGenerate := func() {
+		_, env := envDrop.GetCurrentOption()
+		if strings.TrimSpace(env) == "" {
+			env = "All"
+		}
+		tierIdx, _ := tierDrop.GetCurrentOption()
+		if err := ui.generateRandomMonsterEncounterTable(env, tierIdx+1); err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] random[-:-] %v  %s", err, helpText))
+			return
+		}
+		closeModal()
+	}
+	envDrop.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEscape {
+			closeModal()
+			return
+		}
+		if isSubmitKey(key) {
+			form.SetFocus(1)
+		}
+	})
+	envDrop.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyTab:
+			form.SetFocus(1)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(3) // Cancel button.
+			return nil
+		case tcell.KeyEnter:
+			if !envDrop.IsOpen() {
+				form.SetFocus(1)
+				return nil
+			}
+			return event
+		case tcell.KeyEscape:
+			if envDrop.IsOpen() {
+				return event
+			}
+			closeModal()
+			return nil
+		default:
+			return event
+		}
+	})
+	tierDrop.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEscape {
+			closeModal()
+			return
+		}
+		if key == tcell.KeyTab || key == tcell.KeyEnter {
+			form.SetFocus(2) // Generate button.
+		}
+	})
+	tierDrop.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyTab:
+			form.SetFocus(2)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(0)
+			return nil
+		case tcell.KeyEnter:
+			if !tierDrop.IsOpen() {
+				form.SetFocus(2)
+				return nil
+			}
+			return event
+		case tcell.KeyEscape:
+			if tierDrop.IsOpen() {
+				return event
+			}
+			closeModal()
+			return nil
+		default:
+			return event
+		}
+	})
+	form.AddFormItem(envDrop)
+	form.AddFormItem(tierDrop)
+	form.AddButton("Generate", runGenerate)
+	form.AddButton("Cancel", closeModal)
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(form, 10, 0, true).
+			AddItem(nil, 0, 1, false), 76, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	ui.pages.AddPage("random-encounter-table", modal, true, true)
+	ui.app.SetFocus(form)
+}
+
+func (ui *UI) generateRandomMonsterEncounterTable(environment string, tier int) error {
+	if len(ui.monsters) == 0 {
+		return errors.New("no monsters available")
+	}
+	if tier < 1 || tier > 4 {
+		return fmt.Errorf("invalid tier %d", tier)
+	}
+	environment = strings.TrimSpace(environment)
+	if environment == "" {
+		environment = "All"
+	}
+	candidates := make([]Monster, 0, len(ui.monsters))
+	for _, m := range ui.monsters {
+		if strings.TrimSpace(m.Name) == "" {
+			continue
+		}
+		if !strings.EqualFold(environment, "All") {
+			match := false
+			for _, env := range m.Environment {
+				if strings.EqualFold(strings.TrimSpace(env), environment) {
+					match = true
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+		}
+		cr, ok := crToFloat(m.CR)
+		if !ok {
+			continue
+		}
+		inTier := false
+		switch {
+		case tier == 1:
+			inTier = cr >= 0 && cr <= 4
+		case tier == 2:
+			inTier = cr >= 5 && cr <= 10
+		case tier == 3:
+			inTier = cr >= 11 && cr <= 16
+		default:
+			inTier = cr >= 17
+		}
+		if inTier {
+			candidates = append(candidates, m)
+		}
+	}
+	if len(candidates) == 0 {
+		return fmt.Errorf("no monsters for env=%s tier=%d", environment, tier)
+	}
+
+	avgQty := 1
+	switch tier {
+	case 1:
+		avgQty = 4
+	case 2:
+		avgQty = 2
+	case 3:
+		avgQty = 2
+	case 4:
+		avgQty = 1
+	}
+	lines := []string{
+		fmt.Sprintf("Roll 1d12 for a random encounter table built from loaded manuals data (env: %s, tier: %d).", environment, tier),
+		"",
+		"1d12 Monster Encounter Table",
+	}
+	for i := 1; i <= 12; i++ {
+		qty := avgQty
+		if tier == 1 {
+			qty = rand.Intn(4) + 2 // 2..5
+		} else if tier == 2 {
+			qty = rand.Intn(3) + 1 // 1..3
+		} else if tier == 3 {
+			qty = rand.Intn(2) + 1 // 1..2
+		}
+		choice := candidates[rand.Intn(len(candidates))]
+		src := blankIfEmpty(strings.TrimSpace(choice.Source), "n/a")
+		cr := blankIfEmpty(strings.TrimSpace(choice.CR), "n/a")
+		lines = append(lines, fmt.Sprintf("%2d. %dx %s (CR %s, %s)", i, qty, choice.Name, cr, src))
+	}
+	ui.addRandomEntry("Encounter Tables", "Monster Encounter Table", strings.Join(lines, "\n"))
+	ui.status.SetText(fmt.Sprintf(" [black:gold]random[-:-] generated monster table env=%s tier=%d  %s", environment, tier, helpText))
+	return nil
+}
+
+func (ui *UI) generateRandomEquipmentShopTable() {
+	if len(ui.items) == 0 {
+		ui.status.SetText(fmt.Sprintf(" [white:red] random[-:-] no items available  %s", helpText))
+		return
+	}
+	shopAdj := []string{"Iron", "Stout", "Bronze", "Weathered", "Oak", "Granite", "Rugged", "Frontier", "Anvil", "Ranger", "Shield", "Wayfarer"}
+	shopNoun := []string{"Outfitters", "Armory", "Provisioner", "Supply House", "Gearworks", "Market", "Emporium", "Stockpile"}
+
+	equipmentPool := make([]Monster, 0, len(ui.items))
+	for _, it := range ui.items {
+		if itemLooksEquipment(it) {
+			equipmentPool = append(equipmentPool, it)
+		}
+	}
+	if len(equipmentPool) == 0 {
+		equipmentPool = append([]Monster(nil), ui.items...)
+	}
+
+	equipmentRows := sampleRows(equipmentPool, 12)
+	lines := []string{
+		"Roll 1d12. Entries are assembled from loaded manuals datasets.",
+		"",
+		"1d12 Equipment Shop Table",
+	}
+	for i, it := range equipmentRows {
+		src := blankIfEmpty(strings.TrimSpace(it.Source), "n/a")
+		typ := blankIfEmpty(strings.TrimSpace(it.Type), "gear")
+		shopName := fmt.Sprintf("%s %s", shopAdj[i%len(shopAdj)], shopNoun[rand.Intn(len(shopNoun))])
+		lines = append(lines, fmt.Sprintf("%2d. %s - featured: %s (%s, %s)", i+1, shopName, it.Name, typ, src))
+	}
+	ui.addRandomEntry("Settlement Tables", "Equipment Shop Table", strings.Join(lines, "\n"))
+}
+
+func (ui *UI) generateRandomMagicShopTable() {
+	if len(ui.items) == 0 {
+		ui.status.SetText(fmt.Sprintf(" [white:red] random[-:-] no items available  %s", helpText))
+		return
+	}
+	shopAdj := []string{"Arcane", "Eldritch", "Astral", "Moon", "Rune", "Mystic", "Sigil", "Aether", "Enchanted", "Oracle", "Spellbound", "Starlit"}
+	shopNoun := []string{"Vault", "Emporium", "Boutique", "Cabinet", "Repository", "Curiosity Shop", "Sanctum", "Bazaar"}
+	magicPool := make([]Monster, 0, len(ui.items))
+	for _, it := range ui.items {
+		if itemLooksMagical(it) {
+			magicPool = append(magicPool, it)
+		}
+	}
+	if len(magicPool) == 0 {
+		magicPool = append([]Monster(nil), ui.items...)
+	}
+	magicRows := sampleRows(magicPool, 12)
+	lines := []string{
+		"Roll 1d12. Entries are assembled from loaded manuals datasets.",
+		"",
+		"1d12 Magic Shop Table",
+	}
+	for i, it := range magicRows {
+		src := blankIfEmpty(strings.TrimSpace(it.Source), "n/a")
+		rarity := simpleTitleCase(blankIfEmpty(strings.TrimSpace(it.CR), "unknown"))
+		shopName := fmt.Sprintf("%s %s", shopAdj[i%len(shopAdj)], shopNoun[rand.Intn(len(shopNoun))])
+		lines = append(lines, fmt.Sprintf("%2d. %s - %s (%s, %s)", i+1, shopName, it.Name, rarity, src))
+	}
+	ui.addRandomEntry("Settlement Tables", "Magic Shop Table", strings.Join(lines, "\n"))
 }
 
 func (ui *UI) deleteSelectedRandomEntry() {

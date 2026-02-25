@@ -1177,6 +1177,51 @@ func TestRandomEntriesWithSameNameAreNumbered(t *testing.T) {
 	}
 }
 
+func TestRandomManualTablesGeneration(t *testing.T) {
+	tmp := t.TempDir()
+	monsters := []Monster{
+		{ID: 1, Name: "Goblin", CR: "1/4", Source: "MM", Environment: []string{"forest"}, Raw: map[string]any{"name": "Goblin"}},
+		{ID: 2, Name: "Ogre", CR: "2", Source: "MM", Environment: []string{"desert"}, Raw: map[string]any{"name": "Ogre"}},
+		{ID: 3, Name: "Young Red Dragon", CR: "10", Source: "MM", Environment: []string{"mountain"}, Raw: map[string]any{"name": "Young Red Dragon"}},
+	}
+	items := []Monster{
+		{ID: 10, Name: "Longsword +1", CR: "uncommon", Source: "DMG", Type: "weapon", Raw: map[string]any{"weapon": true}},
+		{ID: 11, Name: "Plate Armor", CR: "unknown", Source: "PHB", Type: "armor", Raw: map[string]any{"armor": true}},
+		{ID: 12, Name: "Wand of Magic Missiles", CR: "uncommon", Source: "DMG", Type: "wand", Raw: map[string]any{"wand": true}},
+	}
+	ui := newUI(monsters, items, nil, nil, nil, nil, nil, nil, nil, nil, nil, filepath.Join(tmp, "encounters.yaml"), filepath.Join(tmp, "dice.yaml"), filepath.Join(tmp, "random.yaml"))
+	ui.setBrowseMode(BrowseRandom)
+
+	if err := ui.generateRandomMonsterEncounterTable("forest", 1); err != nil {
+		t.Fatalf("unexpected encounter table error: %v", err)
+	}
+	ui.generateRandomEquipmentShopTable()
+	ui.generateRandomMagicShopTable()
+	if len(ui.randoms) != 3 {
+		t.Fatalf("expected 3 generated random entries, got %d", len(ui.randoms))
+	}
+
+	encountersBody := strings.TrimSpace(asString(ui.randoms[0].Raw["content"]))
+	if !strings.Contains(encountersBody, "1d12 Monster Encounter Table") {
+		t.Fatalf("expected monster encounter table header, got: %q", encountersBody)
+	}
+	if !strings.Contains(encountersBody, "env: forest, tier: 1") {
+		t.Fatalf("expected env/tier details in encounter table, got: %q", encountersBody)
+	}
+	if strings.Contains(encountersBody, "Ogre") || strings.Contains(encountersBody, "Young Red Dragon") {
+		t.Fatalf("expected tier/environment filtering to exclude out-of-filter monsters, got: %q", encountersBody)
+	}
+
+	equipBody := strings.TrimSpace(asString(ui.randoms[1].Raw["content"]))
+	if !strings.Contains(equipBody, "1d12 Equipment Shop Table") {
+		t.Fatalf("expected equipment shop table section, got: %q", equipBody)
+	}
+	magicBody := strings.TrimSpace(asString(ui.randoms[2].Raw["content"]))
+	if !strings.Contains(magicBody, "1d12 Magic Shop Table") {
+		t.Fatalf("expected magic shop table section, got: %q", magicBody)
+	}
+}
+
 func TestEncounterConditionsBadgeAndRoundProgress(t *testing.T) {
 	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
 	ui.encounterItems = []EncounterEntry{
