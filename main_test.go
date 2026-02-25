@@ -1943,6 +1943,33 @@ func TestGlobalInputCaptureBypassesHotkeysWhileAddCustomVisible(t *testing.T) {
 	}
 }
 
+func TestGlobalShortcutClearsBrowseFiltersFromDetailPane(t *testing.T) {
+	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
+	ui.nameFilter = "aar"
+	ui.nameInput.SetText("aar")
+	ui.envFilter = "mountain"
+	ui.crFilter = "1/4"
+	ui.typeFilter = "humanoid"
+	ui.sourceFilters = map[string]struct{}{"MM": {}}
+	ui.app.SetFocus(ui.detailRaw)
+
+	capture := ui.app.GetInputCapture()
+	if capture == nil {
+		t.Fatal("expected global input capture to be configured")
+	}
+	ev := capture(tcell.NewEventKey(tcell.KeyRune, 'X', tcell.ModNone))
+	if ev != nil {
+		t.Fatalf("expected X to be consumed for global filter reset, got %#v", ev)
+	}
+	if ui.nameFilter != "" || ui.envFilter != "" || ui.crFilter != "" || ui.typeFilter != "" || len(ui.sourceFilters) != 0 {
+		t.Fatalf("expected filters to be cleared, got name=%q env=%q cr=%q type=%q sources=%v",
+			ui.nameFilter, ui.envFilter, ui.crFilter, ui.typeFilter, ui.sourceFilters)
+	}
+	if ui.app.GetFocus() != ui.list {
+		t.Fatalf("expected focus to return to list, got %T", ui.app.GetFocus())
+	}
+}
+
 func TestPanelJumpModalShortcutSelectsBrowsePanel(t *testing.T) {
 	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
 	capture := ui.app.GetInputCapture()

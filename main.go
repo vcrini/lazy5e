@@ -1164,6 +1164,12 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case event.Key() == tcell.KeyBacktab:
 			ui.focusPrev()
 			return nil
+		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == 'X':
+			if ui.focusHasBrowseFilters(focus) {
+				ui.clearCurrentBrowseFilters()
+				return nil
+			}
+			return event
 		case (focus == ui.list || focus == ui.nameInput || focus == ui.envDrop || focus == ui.sourceDrop || focus == ui.crDrop || focus == ui.typeDrop) &&
 			event.Key() == tcell.KeyRune && event.Rune() == 'x':
 			ui.clearCurrentBrowseFilters()
@@ -2015,6 +2021,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		"  Esc : close help\n" +
 		"  q : quit app\n" +
 		"  f : fullscreen on/off current panel\n" +
+		"  X : clear filters in current browse mode\n" +
 		"  Tab / Shift+Tab : change focus\n" +
 		"  0 / 1 / 2 / 3 : go to Dice / Encounters / Catalog / Description\n" +
 		"  G : open panel jump modal (panel + shortcut)\n" +
@@ -4097,6 +4104,15 @@ func (ui *UI) maybeReturnFocusToListFromFilter() {
 	focus := ui.app.GetFocus()
 	if focus == ui.envDrop || focus == ui.crDrop || focus == ui.typeDrop {
 		ui.app.SetFocus(ui.list)
+	}
+}
+
+func (ui *UI) focusHasBrowseFilters(focus tview.Primitive) bool {
+	switch focus {
+	case ui.list, ui.detailMeta, ui.detailRaw, ui.detailTreasure, ui.nameInput, ui.envDrop, ui.sourceDrop, ui.crDrop, ui.typeDrop:
+		return true
+	default:
+		return false
 	}
 }
 
