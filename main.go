@@ -12512,6 +12512,12 @@ func (ui *UI) openEncounterSkillCheckModal() {
 	bonusField.SetFieldBackgroundColor(tcell.ColorWhite)
 	bonusField.SetFieldTextColor(tcell.ColorBlack)
 	bonusField.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	dcField := tview.NewInputField().SetLabel("DC: ").SetFieldWidth(8)
+	dcField.SetLabelColor(tcell.ColorGold)
+	dcField.SetFieldBackgroundColor(tcell.ColorWhite)
+	dcField.SetFieldTextColor(tcell.ColorBlack)
+	dcField.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	dcField.SetText("15")
 
 	fillBonus := func(skill string) {
 		if b, ok := ui.encounterSkillBonus(entry, skill); ok {
@@ -12536,33 +12542,48 @@ func (ui *UI) openEncounterSkillCheckModal() {
 	form.SetBackgroundColor(tcell.ColorBlack)
 	form.AddFormItem(skillDrop)
 	form.AddFormItem(bonusField)
+	form.AddFormItem(dcField)
 
 	closeModal := func() {
 		ui.pages.RemovePage("encounter-skill-check")
 		ui.skillCheckVisible = false
 		ui.app.SetFocus(ui.encounter)
 	}
-	rollNow := func() {
-		_, skill := skillDrop.GetCurrentOption()
-		bonusText := strings.TrimSpace(bonusField.GetText())
-		if bonusText == "" {
-			bonusText = "0"
+		rollNow := func() {
+			_, skill := skillDrop.GetCurrentOption()
+			bonusText := strings.TrimSpace(bonusField.GetText())
+			if bonusText == "" {
+				bonusText = "0"
 		}
 		bonus, err := strconv.Atoi(bonusText)
-		if err != nil {
-			ui.status.SetText(fmt.Sprintf(" [white:red] invalid skill bonus[-:-] \"%s\"  %s", bonusText, helpText))
-			return
+			if err != nil {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid skill bonus[-:-] \"%s\"  %s", bonusText, helpText))
+				return
+			}
+			dcText := strings.TrimSpace(dcField.GetText())
+			if dcText == "" {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+				return
+			}
+			dc, err := strconv.Atoi(dcText)
+			if err != nil || dc < 0 {
+				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+				return
+			}
+			roll := rand.Intn(20) + 1
+			total := roll + bonus
+			sign := "+"
+			if bonus < 0 {
+				sign = ""
+			}
+			outcome := "ko"
+			if total >= dc {
+				outcome = "ok"
+			}
+			ui.status.SetText(fmt.Sprintf(" [black:gold] skill[-:-] %s %s vs DC %d: d20(%d) %s%d = %d (%s)  %s",
+				ui.encounterEntryDisplay(entry), skill, dc, roll, sign, bonus, total, outcome, helpText))
+			closeModal()
 		}
-		roll := rand.Intn(20) + 1
-		total := roll + bonus
-		sign := "+"
-		if bonus < 0 {
-			sign = ""
-		}
-		ui.status.SetText(fmt.Sprintf(" [black:gold] skill[-:-] %s %s d20(%d) %s%d = %d  %s",
-			ui.encounterEntryDisplay(entry), skill, roll, sign, bonus, total, helpText))
-		closeModal()
-	}
 
 	form.AddButton("Roll", rollNow)
 	form.AddButton("Cancel", closeModal)
@@ -12582,7 +12603,7 @@ func (ui *UI) openEncounterSkillCheckModal() {
 			form.SetFocus(1)
 			return nil
 		case tcell.KeyBacktab:
-			form.SetFocus(3)
+			form.SetFocus(4)
 			return nil
 		case tcell.KeyEnter:
 			if !skillDrop.IsOpen() {
@@ -12629,12 +12650,34 @@ func (ui *UI) openEncounterSkillCheckModal() {
 			return event
 		}
 	})
+	dcField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEnter:
+			rollNow()
+			return nil
+		case tcell.KeyTab:
+			form.SetFocus(3)
+			return nil
+		case tcell.KeyBacktab:
+			form.SetFocus(1)
+			return nil
+		case tcell.KeyEscape:
+			closeModal()
+			return nil
+		default:
+			if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
+				closeModal()
+				return nil
+			}
+			return event
+		}
+	})
 
 	modal := tview.NewFlex().
 		AddItem(nil, 0, 1, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 			AddItem(nil, 0, 1, false).
-			AddItem(form, 10, 0, true).
+			AddItem(form, 12, 0, true).
 			AddItem(nil, 0, 1, false), 56, 0, true).
 		AddItem(nil, 0, 1, false)
 
