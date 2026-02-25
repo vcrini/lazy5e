@@ -1475,6 +1475,17 @@ func TestRollDiceExpression(t *testing.T) {
 	if _, _, err := rollDiceExpression("1d6 > x"); err == nil {
 		t.Fatal("expected invalid threshold error")
 	}
+
+	total, breakdown, err = rollDiceExpression("(4d1+1:slash)+(3d1:acid)")
+	if err != nil {
+		t.Fatalf("unexpected labeled-groups error: %v", err)
+	}
+	if total != 8 {
+		t.Fatalf("expected labeled total 8, got %d", total)
+	}
+	if breakdown != "5 (slash) + 3 (acid) = 8" {
+		t.Fatalf("unexpected labeled breakdown: %q", breakdown)
+	}
 }
 
 func TestChooseDiceMode(t *testing.T) {

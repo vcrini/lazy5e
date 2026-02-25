@@ -1704,13 +1704,16 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  l : load dice results (load)\n" +
 			"  f : fullscreen on/off Dice panel\n" +
 			"\n" +
-			"[black:gold]Examples[-:-]\n" +
-			"  2d6+d20+1\n" +
-			"  d20v+5   (v = keep higher of 2 rolls)\n" +
-			"  d20s+1   (s = keep lower of 2 rolls)\n" +
-			"  d2,d3,d4\n" +
-			"  4d10+6d6+5\n" +
-			"  1d6 x2\n" +
+				"[black:gold]Examples[-:-]\n" +
+				"  2d6+d20+1\n" +
+				"  d20v+5   (v = keep higher of 2 rolls)\n" +
+				"  d20s+1   (s = keep lower of 2 rolls)\n" +
+				"  d20a+5   (a alias of v)\n" +
+				"  d20d+1   (d alias of s)\n" +
+				"  (4d8+1:slash)+(3d6:acid)\n" +
+				"  d2,d3,d4\n" +
+				"  4d10+6d6+5\n" +
+				"  1d6 x2\n" +
 			"  1d6-1\n" +
 			"  1d20+5 > 2\n" +
 			"  2d6+d20-1 > 15\n" +
