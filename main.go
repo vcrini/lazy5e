@@ -42,8 +42,16 @@ const (
 )
 
 var (
-	helpText   = helpTextBase
-	appVersion = "dev"
+	helpText       = helpTextBase
+	appVersion     = "dev"
+	randomNPCNames = []string{
+		"Marwen Holt",
+		"Ilyra Voss",
+		"Bramm Tallow",
+		"Sera Nym",
+		"Tavik Rime",
+		"Dorian Pike",
+	}
 )
 
 //go:embed data/monster.yaml
@@ -131,6 +139,7 @@ type EncounterEntry struct {
 	Ordinal          int
 	Custom           bool
 	CustomName       string
+	CustomLevel      int
 	CustomInit       int
 	CustomAC         string
 	CustomPassive    int
@@ -176,6 +185,7 @@ type PersistedEncounterItem struct {
 	Ordinal          int             `yaml:"ordinal"`
 	Custom           bool            `yaml:"custom,omitempty"`
 	CustomName       string          `yaml:"custom_name,omitempty"`
+	CustomLevel      int             `yaml:"custom_level,omitempty"`
 	CustomInit       int             `yaml:"custom_init,omitempty"`
 	CustomAC         string          `yaml:"custom_ac,omitempty"`
 	CustomPassive    int             `yaml:"custom_passive,omitempty"`
@@ -1018,8 +1028,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			}
 		}
 
-		if ui.addCustomVisible && event.Key() == tcell.KeyTab {
-			return tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone)
+		if ui.addCustomVisible {
+			// While add-custom modal is open, do not process global shortcuts.
+			return event
 		}
 		if ui.charCreateVisible || ui.encounterEditVisible || ui.encounterGenVisible {
 			// While character creation modal is open, avoid global hotkeys stealing focus.
@@ -1998,30 +2009,30 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		"  b / v / z : Manuals / Adventures / Random\n\n"
 
 	switch focus {
-		case ui.dice:
-			return header +
-				"[black:gold]Dice[-:-]\n" +
-				"  a : roll dice expression (e.g. 2d6+d20+1)\n" +
-				"  Enter : re-roll selected row\n" +
-				"  g# / g$ / g^ : goto row # / last row / first row (g1 alias)\n" +
-				"  A : re-roll all rows in history\n" +
-				"  e : edit + re-roll selected row\n" +
-				"  d : delete selected row\n" +
-				"  c : clear all rows\n" +
+	case ui.dice:
+		return header +
+			"[black:gold]Dice[-:-]\n" +
+			"  a : roll dice expression (e.g. 2d6+d20+1)\n" +
+			"  Enter : re-roll selected row\n" +
+			"  g# / g$ / g^ : goto row # / last row / first row (g1 alias)\n" +
+			"  A : re-roll all rows in history\n" +
+			"  e : edit + re-roll selected row\n" +
+			"  d : delete selected row\n" +
+			"  c : clear all rows\n" +
 			"  s : save dice results (save as)\n" +
 			"  l : load dice results (load)\n" +
 			"  f : fullscreen on/off Dice panel\n" +
 			"\n" +
-				"[black:gold]Examples[-:-]\n" +
-				"  2d6+d20+1\n" +
-				"  d20v+5   (v = keep higher of 2 rolls)\n" +
-				"  d20s+1   (s = keep lower of 2 rolls)\n" +
-				"  d20a+5   (a alias of v)\n" +
-				"  d20d+1   (d alias of s)\n" +
-				"  (4d8+1:slash)+(3d6:acid)\n" +
-				"  d2,d3,d4\n" +
-				"  4d10+6d6+5\n" +
-				"  1d6 x2\n" +
+			"[black:gold]Examples[-:-]\n" +
+			"  2d6+d20+1\n" +
+			"  d20v+5   (v = keep higher of 2 rolls)\n" +
+			"  d20s+1   (s = keep lower of 2 rolls)\n" +
+			"  d20a+5   (a alias of v)\n" +
+			"  d20d+1   (d alias of s)\n" +
+			"  (4d8+1:slash)+(3d6:acid)\n" +
+			"  d2,d3,d4\n" +
+			"  4d10+6d6+5\n" +
+			"  1d6 x2\n" +
 			"  1d6-1\n" +
 			"  1d20+5 > 2\n" +
 			"  2d6+d20-1 > 15\n" +
@@ -4693,6 +4704,14 @@ func chooseOne(values []string) string {
 	return values[rand.Intn(len(values))]
 }
 
+func randomEncounterCustomName() string {
+	name := strings.TrimSpace(chooseOne(randomNPCNames))
+	if name == "" {
+		return "Custom"
+	}
+	return name
+}
+
 func baseRandomTitle(name string) string {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
@@ -4777,12 +4796,11 @@ func (ui *UI) generateRandomDungeonLayout() {
 }
 
 func (ui *UI) generateRandomNPC() {
-	names := []string{"Marwen Holt", "Ilyra Voss", "Bramm Tallow", "Sera Nym", "Tavik Rime", "Dorian Pike"}
 	traits := []string{"meticulous and paranoid", "charming but evasive", "idealistic and stubborn", "coldly pragmatic", "superstitious yet brave"}
 	motivations := []string{"redeem a family disgrace", "secure rare medicine", "take revenge on a rival faction", "protect a hidden heir", "recover a stolen relic"}
 	professions := []string{"quartermaster", "street physician", "cartographer", "dockmaster", "arcane scribe", "mercenary captain"}
 	body := fmt.Sprintf("Name: %s\nTrait: %s\nMotivation: %s\nProfession: %s",
-		chooseOne(names), chooseOne(traits), chooseOne(motivations), chooseOne(professions))
+		chooseOne(randomNPCNames), chooseOne(traits), chooseOne(motivations), chooseOne(professions))
 	ui.addRandomEntry("NPC & World", "NPC Profile", body)
 }
 
@@ -5105,6 +5123,9 @@ func (ui *UI) renderDetailByCustomEntry(entry EncounterEntry) {
 		}
 		if strings.TrimSpace(entry.CustomAC) != "" {
 			fmt.Fprintf(builder, "[white]AC:[-] %s\n", entry.CustomAC)
+		}
+		if entry.CustomLevel > 0 {
+			fmt.Fprintf(builder, "[white]Level:[-] %d\n", entry.CustomLevel)
 		}
 		if maxHP > 0 {
 			fmt.Fprintf(builder, "[white]HP:[-] %d/%d\n", entry.CurrentHP, maxHP)
@@ -6922,6 +6943,9 @@ func buildCustomDescriptionText(entry EncounterEntry, maxHP int) string {
 	}
 	b := &strings.Builder{}
 	fmt.Fprintf(b, "Name: %s\n", entry.CustomName)
+	if entry.CustomLevel > 0 {
+		fmt.Fprintf(b, "Level: %d\n", entry.CustomLevel)
+	}
 	fmt.Fprintf(b, "Initiative: %d\n", entry.CustomInit)
 	if entry.HasInitRoll {
 		fmt.Fprintf(b, "Initiative Roll: %d\n", entry.InitRoll)
@@ -8200,10 +8224,17 @@ func (ui *UI) openAddCustomEncounterForm() {
 	ui.addCustomVisible = true
 
 	nameField := tview.NewInputField().SetLabel("Name: ").SetFieldWidth(28)
+	levelField := tview.NewInputField().SetLabel("Level: ").SetFieldWidth(8)
 	initField := tview.NewInputField().SetLabel("Init (x or x/x): ").SetFieldWidth(16)
 	hpField := tview.NewInputField().SetLabel("HP (z or x/y): ").SetFieldWidth(16)
 	acField := tview.NewInputField().SetLabel("AC (optional): ").SetFieldWidth(8)
 	passiveField := tview.NewInputField().SetLabel("Passive Perception (optional): ").SetFieldWidth(8)
+	nameField.SetText(randomEncounterCustomName())
+	levelField.SetText("1")
+	initField.SetText("0")
+	hpField.SetText("5")
+	acField.SetText("10")
+	passiveField.SetText("0")
 
 	setFieldStyle := func(f *tview.InputField) {
 		f.SetLabelColor(tcell.ColorGold)
@@ -8212,12 +8243,14 @@ func (ui *UI) openAddCustomEncounterForm() {
 		f.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
 	}
 	setFieldStyle(nameField)
+	setFieldStyle(levelField)
 	setFieldStyle(initField)
 	setFieldStyle(hpField)
 	setFieldStyle(acField)
 	setFieldStyle(passiveField)
 
 	form.AddFormItem(nameField)
+	form.AddFormItem(levelField)
 	form.AddFormItem(initField)
 	form.AddFormItem(hpField)
 	form.AddFormItem(acField)
@@ -8227,18 +8260,27 @@ func (ui *UI) openAddCustomEncounterForm() {
 		name := strings.TrimSpace(nameField.GetText())
 		if name == "" {
 			ui.status.SetText(fmt.Sprintf(" [white:red] invalid name[-:-]  %s", helpText))
+			ui.app.SetFocus(nameField)
+			return
+		}
+		level, err := strconv.Atoi(strings.TrimSpace(levelField.GetText()))
+		if err != nil || level < 1 {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid level (min 1)[-:-]  %s", helpText))
+			ui.app.SetFocus(levelField)
 			return
 		}
 
 		hasRoll, initRoll, initBase, ok := parseInitInput(initField.GetText())
 		if !ok {
 			ui.status.SetText(fmt.Sprintf(" [white:red] invalid init[-:-]  %s", helpText))
+			ui.app.SetFocus(initField)
 			return
 		}
 
 		currentHP, maxHP, ok := parseHPInput(hpField.GetText())
 		if !ok {
 			ui.status.SetText(fmt.Sprintf(" [white:red] HP non validi[-:-]  %s", helpText))
+			ui.app.SetFocus(hpField)
 			return
 		}
 
@@ -8246,6 +8288,7 @@ func (ui *UI) openAddCustomEncounterForm() {
 		if ac != "" {
 			if _, err := strconv.Atoi(ac); err != nil {
 				ui.status.SetText(fmt.Sprintf(" [white:red] invalid AC[-:-]  %s", helpText))
+				ui.app.SetFocus(acField)
 				return
 			}
 		}
@@ -8256,6 +8299,7 @@ func (ui *UI) openAddCustomEncounterForm() {
 			n, err := strconv.Atoi(passiveText)
 			if err != nil || n < 0 {
 				ui.status.SetText(fmt.Sprintf(" [white:red] invalid Passive Perception[-:-]  %s", helpText))
+				ui.app.SetFocus(passiveField)
 				return
 			}
 			hasPassive = true
@@ -8269,6 +8313,7 @@ func (ui *UI) openAddCustomEncounterForm() {
 			Ordinal:          ordinal,
 			Custom:           true,
 			CustomName:       name,
+			CustomLevel:      level,
 			CustomInit:       initBase,
 			CustomAC:         ac,
 			CustomPassive:    passive,
@@ -8297,7 +8342,7 @@ func (ui *UI) openAddCustomEncounterForm() {
 		AddItem(nil, 0, 1, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 			AddItem(nil, 0, 1, false).
-			AddItem(form, 14, 0, true).
+			AddItem(form, 16, 0, true).
 			AddItem(nil, 0, 1, false), 74, 0, true).
 		AddItem(nil, 0, 1, false)
 
@@ -10073,6 +10118,7 @@ func (ui *UI) loadEncounters() error {
 			Ordinal:          ordinal,
 			Custom:           it.Custom,
 			CustomName:       it.CustomName,
+			CustomLevel:      it.CustomLevel,
 			CustomInit:       it.CustomInit,
 			CustomAC:         it.CustomAC,
 			CustomPassive:    it.CustomPassive,
@@ -10126,6 +10172,9 @@ func (ui *UI) backfillCustomEncounterDetails(entry *EncounterEntry) {
 		}
 		if strings.TrimSpace(entry.CustomAC) != "" {
 			fmt.Fprintf(b, "[white]AC:[-] %s\n", entry.CustomAC)
+		}
+		if entry.CustomLevel > 0 {
+			fmt.Fprintf(b, "[white]Level:[-] %d\n", entry.CustomLevel)
 		}
 		if entry.HasCustomPassive {
 			fmt.Fprintf(b, "[white]Passive Perception:[-] %d\n", max(0, entry.CustomPassive))
@@ -10216,6 +10265,7 @@ func (ui *UI) saveEncounters() error {
 			Ordinal:          it.Ordinal,
 			Custom:           it.Custom,
 			CustomName:       it.CustomName,
+			CustomLevel:      it.CustomLevel,
 			CustomInit:       it.CustomInit,
 			CustomAC:         it.CustomAC,
 			CustomPassive:    it.CustomPassive,
@@ -12880,41 +12930,41 @@ func (ui *UI) openEncounterSkillCheckModal() {
 		ui.skillCheckVisible = false
 		ui.app.SetFocus(ui.encounter)
 	}
-		rollNow := func() {
-			_, skill := skillDrop.GetCurrentOption()
-			bonusText := strings.TrimSpace(bonusField.GetText())
-			if bonusText == "" {
-				bonusText = "0"
+	rollNow := func() {
+		_, skill := skillDrop.GetCurrentOption()
+		bonusText := strings.TrimSpace(bonusField.GetText())
+		if bonusText == "" {
+			bonusText = "0"
 		}
 		bonus, err := strconv.Atoi(bonusText)
-			if err != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] invalid skill bonus[-:-] \"%s\"  %s", bonusText, helpText))
-				return
-			}
-			dcText := strings.TrimSpace(dcField.GetText())
-			if dcText == "" {
-				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
-				return
-			}
-			dc, err := strconv.Atoi(dcText)
-			if err != nil || dc < 0 {
-				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
-				return
-			}
-			roll := rand.Intn(20) + 1
-			total := roll + bonus
-			sign := "+"
-			if bonus < 0 {
-				sign = ""
-			}
-			outcome := "ko"
-			if total >= dc {
-				outcome = "ok"
-			}
-			ui.status.SetText(fmt.Sprintf(" [black:gold] skill[-:-] %s %s vs DC %d: d20(%d) %s%d = %d (%s)  %s",
-				ui.encounterEntryDisplay(entry), skill, dc, roll, sign, bonus, total, outcome, helpText))
-			closeModal()
+		if err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid skill bonus[-:-] \"%s\"  %s", bonusText, helpText))
+			return
 		}
+		dcText := strings.TrimSpace(dcField.GetText())
+		if dcText == "" {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+			return
+		}
+		dc, err := strconv.Atoi(dcText)
+		if err != nil || dc < 0 {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+			return
+		}
+		roll := rand.Intn(20) + 1
+		total := roll + bonus
+		sign := "+"
+		if bonus < 0 {
+			sign = ""
+		}
+		outcome := "ko"
+		if total >= dc {
+			outcome = "ok"
+		}
+		ui.status.SetText(fmt.Sprintf(" [black:gold] skill[-:-] %s %s vs DC %d: d20(%d) %s%d = %d (%s)  %s",
+			ui.encounterEntryDisplay(entry), skill, dc, roll, sign, bonus, total, outcome, helpText))
+		closeModal()
+	}
 
 	form.AddButton("Roll", rollNow)
 	form.AddButton("Cancel", closeModal)
@@ -13085,41 +13135,41 @@ func (ui *UI) openEncounterSaveCheckModal() {
 		ui.saveCheckVisible = false
 		ui.app.SetFocus(ui.encounter)
 	}
-		rollNow := func() {
-			_, save := saveDrop.GetCurrentOption()
-			bonusText := strings.TrimSpace(bonusField.GetText())
-			if bonusText == "" {
-				bonusText = "0"
+	rollNow := func() {
+		_, save := saveDrop.GetCurrentOption()
+		bonusText := strings.TrimSpace(bonusField.GetText())
+		if bonusText == "" {
+			bonusText = "0"
 		}
 		bonus, err := strconv.Atoi(bonusText)
-			if err != nil {
-				ui.status.SetText(fmt.Sprintf(" [white:red] invalid save bonus[-:-] \"%s\"  %s", bonusText, helpText))
-				return
-			}
-			dcText := strings.TrimSpace(dcField.GetText())
-			if dcText == "" {
-				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
-				return
-			}
-			dc, err := strconv.Atoi(dcText)
-			if err != nil || dc < 0 {
-				ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
-				return
-			}
-			roll := rand.Intn(20) + 1
-			total := roll + bonus
-			sign := "+"
-			if bonus < 0 {
-				sign = ""
-			}
-			outcome := "ko"
-			if total >= dc {
-				outcome = "ok"
-			}
-			ui.status.SetText(fmt.Sprintf(" [black:gold] save[-:-] %s %s vs DC %d: d20(%d) %s%d = %d (%s)  %s",
-				ui.encounterEntryDisplay(entry), save, dc, roll, sign, bonus, total, outcome, helpText))
-			closeModal()
+		if err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid save bonus[-:-] \"%s\"  %s", bonusText, helpText))
+			return
 		}
+		dcText := strings.TrimSpace(dcField.GetText())
+		if dcText == "" {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+			return
+		}
+		dc, err := strconv.Atoi(dcText)
+		if err != nil || dc < 0 {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid DC[-:-] \"%s\"  %s", dcText, helpText))
+			return
+		}
+		roll := rand.Intn(20) + 1
+		total := roll + bonus
+		sign := "+"
+		if bonus < 0 {
+			sign = ""
+		}
+		outcome := "ko"
+		if total >= dc {
+			outcome = "ok"
+		}
+		ui.status.SetText(fmt.Sprintf(" [black:gold] save[-:-] %s %s vs DC %d: d20(%d) %s%d = %d (%s)  %s",
+			ui.encounterEntryDisplay(entry), save, dc, roll, sign, bonus, total, outcome, helpText))
+		closeModal()
+	}
 
 	form.AddButton("Roll", rollNow)
 	form.AddButton("Cancel", closeModal)
@@ -13183,9 +13233,9 @@ func (ui *UI) openEncounterSaveCheckModal() {
 				closeModal()
 				return nil
 			}
-				return event
-			}
-		})
+			return event
+		}
+	})
 	dcField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyEnter:

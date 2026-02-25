@@ -1875,7 +1875,7 @@ func TestTurnModeFullCycleAndRenderMarkers(t *testing.T) {
 	}
 }
 
-func TestGlobalInputCaptureTurnsTabIntoEnterWhileAddCustomVisible(t *testing.T) {
+func TestGlobalInputCaptureBypassesHotkeysWhileAddCustomVisible(t *testing.T) {
 	ui := makeTestUI(t, []Monster{mkMonster(1, "Aarakocra", 14, 13, "3d8")})
 	capture := ui.app.GetInputCapture()
 	if capture == nil {
@@ -1884,8 +1884,8 @@ func TestGlobalInputCaptureTurnsTabIntoEnterWhileAddCustomVisible(t *testing.T) 
 
 	ui.addCustomVisible = true
 	ev := capture(tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone))
-	if ev == nil || ev.Key() != tcell.KeyEnter {
-		t.Fatalf("expected tab to be translated to enter in add custom mode, got %#v", ev)
+	if ev == nil || ev.Key() != tcell.KeyTab {
+		t.Fatalf("expected tab to be passed through in add custom mode, got %#v", ev)
 	}
 
 	ui.addCustomVisible = false
