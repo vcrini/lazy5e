@@ -622,6 +622,7 @@ type UI struct {
 	panelJumpVisible            bool
 	panelJumpReturnFocus        tview.Primitive
 	diceGotoPending             bool
+	campaignLoadVisible         bool
 }
 
 func main() {
@@ -1130,6 +1131,15 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			// While modal is open, do not process global shortcuts (1/2/3/q/...).
 			return event
 		}
+		if ui.campaignLoadVisible {
+			if event.Key() == tcell.KeyEscape {
+				ui.pages.RemovePage("campaign-load")
+				ui.campaignLoadVisible = false
+				ui.app.SetFocus(ui.list)
+				return nil
+			}
+			return event
+		}
 		if ui.skillCheckVisible || ui.saveCheckVisible {
 			// While skill check modal is open, do not process global shortcuts (1/2/3/...).
 			return event
@@ -1542,10 +1552,32 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			ui.app.SetFocus(ui.list)
 			return nil
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == '3':
-			ui.app.SetFocus(ui.detailRaw)
+			if focus == ui.detailRaw {
+				ui.activeBottomPanel = "treasure"
+				ui.detailBottom.SwitchToPage("treasure")
+				ui.app.SetFocus(ui.detailTreasure)
+			} else if focus == ui.detailTreasure {
+				ui.activeBottomPanel = "description"
+				ui.detailBottom.SwitchToPage("description")
+				ui.app.SetFocus(ui.detailRaw)
+			} else {
+				if ui.activeBottomPanel == "treasure" {
+					ui.detailBottom.SwitchToPage("treasure")
+					ui.app.SetFocus(ui.detailTreasure)
+				} else {
+					ui.detailBottom.SwitchToPage("description")
+					ui.app.SetFocus(ui.detailRaw)
+				}
+			}
 			return nil
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == '0':
 			ui.app.SetFocus(ui.dice)
+			return nil
+		case event.Key() == tcell.KeyCtrlS && !focusIsInputField:
+			ui.openCampaignSaveInput()
+			return nil
+		case event.Key() == tcell.KeyCtrlO && !focusIsInputField:
+			ui.openCampaignLoadModal()
 			return nil
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == '4':
 			ui.setBrowseMode(BrowseMonsters)
@@ -2069,11 +2101,13 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 		"  f : fullscreen on/off current panel\n" +
 		"  X : clear filters in current browse mode\n" +
 		"  Tab / Shift+Tab : change focus\n" +
-		"  0 / 1 / 2 / 3 : go to Dice / Encounters / Catalog / Description\n" +
+		"  0 / 1 / 2 / 3 : go to Dice / Encounters / Catalog / Description↔Treasure (toggle)\n" +
 		"  G : open panel jump modal (panel + shortcut)\n" +
 		"  [ / ] : previous/next browse panel\n" +
 		"  4 / 5 / 6 / 7 / 8 / 9 : Monsters / Items / Spells / Characters / Races / Feats\n" +
-		"  b / v / z : Manuals / Adventures / Random\n\n"
+		"  b / v / z : Manuals / Adventures / Random\n" +
+		"  Ctrl+S : save campaign (encounters + dice + treasure)\n" +
+		"  Ctrl+O : load campaign from folder\n\n"
 
 	switch focus {
 	case ui.dice:
@@ -2771,6 +2805,14 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+func appendTreasureText(existing, newText string) string {
+	existing = strings.TrimSpace(existing)
+	if existing == "" || strings.EqualFold(existing, "no treasure generated.") {
+		return newText
+	}
+	return existing + "\n\n─────────\n\n" + newText
+}
+
 func newShortUUID() string {
 	var b [16]byte
 	if _, err := crand.Read(b[:]); err != nil {
@@ -2837,9 +2879,10 @@ func (ui *UI) renderGeneratedSpellTreasure(filter SpellTreasureFilter, spells []
 	for i, sp := range spells {
 		lines = append(lines, fmt.Sprintf("%d. %s [%s] (Level %s, %s)", i+1, sp.Name, sp.Source, sp.CR, sp.Type))
 	}
-	ui.treasureText = fmt.Sprintf("[yellow]Generated Spells[-]\n[white]Level:[-] %s  [white]School:[-] %s  [white]Qty:[-] %d\n\n%s", blankIfEmpty(filter.Level, "random"), blankIfEmpty(filter.School, "random"), len(spells), strings.Join(lines, "\n"))
+	newText := fmt.Sprintf("[yellow]Generated Spells[-]\n[white]Level:[-] %s  [white]School:[-] %s  [white]Qty:[-] %d\n\n%s", blankIfEmpty(filter.Level, "random"), blankIfEmpty(filter.School, "random"), len(spells), strings.Join(lines, "\n"))
+	ui.treasureText = appendTreasureText(ui.treasureText, newText)
 	ui.detailTreasure.SetText(ui.treasureText)
-	ui.detailTreasure.ScrollToBeginning()
+	ui.detailTreasure.ScrollToEnd()
 	ui.activeBottomPanel = "treasure"
 	if ui.detailBottom != nil {
 		ui.detailBottom.SwitchToPage("treasure")
@@ -2968,9 +3011,10 @@ func (ui *UI) renderGeneratedItemTreasure(kind string, items []Monster) {
 		lines = append(lines, fmt.Sprintf("%d. %s [%s] (%s) - %s", i+1, it.Name, it.Source, rarity, price))
 	}
 
-	ui.treasureText = fmt.Sprintf("[yellow]Generated Items[-]\n[white]Type:[-] %s  [white]Qty:[-] %d\n\n%s", kind, len(items), strings.Join(lines, "\n"))
+	newText := fmt.Sprintf("[yellow]Generated Items[-]\n[white]Type:[-] %s  [white]Qty:[-] %d\n\n%s", kind, len(items), strings.Join(lines, "\n"))
+	ui.treasureText = appendTreasureText(ui.treasureText, newText)
 	ui.detailTreasure.SetText(ui.treasureText)
-	ui.detailTreasure.ScrollToBeginning()
+	ui.detailTreasure.ScrollToEnd()
 	ui.activeBottomPanel = "treasure"
 	if ui.detailBottom != nil {
 		ui.detailBottom.SwitchToPage("treasure")
@@ -3027,9 +3071,9 @@ func (ui *UI) renderTreasureOutcome(crText string, out treasureOutcome) {
 		}
 	}
 	fmt.Fprintf(tre, "[white]GP eq:[-] %.2f", totalGP)
-	ui.treasureText = tre.String()
+	ui.treasureText = appendTreasureText(ui.treasureText, tre.String())
 	ui.detailTreasure.SetText(ui.treasureText)
-	ui.detailTreasure.ScrollToBeginning()
+	ui.detailTreasure.ScrollToEnd()
 	ui.activeBottomPanel = "treasure"
 	if ui.detailBottom != nil {
 		ui.detailBottom.SwitchToPage("treasure")
@@ -14478,4 +14522,194 @@ func resolveEncounterEditSubmit(formItem int, button int, classOpen bool) formSu
 		return submitFocusLevels
 	}
 	return submitApply
+}
+
+func (ui *UI) openCampaignSaveInput() {
+	input := tview.NewInputField().
+		SetLabel("Campaign name: ").
+		SetFieldWidth(40)
+	input.SetLabelColor(tcell.ColorGold)
+	input.SetFieldBackgroundColor(tcell.ColorWhite)
+	input.SetFieldTextColor(tcell.ColorBlack)
+	input.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	input.SetBackgroundColor(tcell.ColorBlack)
+	input.SetBorder(true)
+	input.SetTitle(" Save Campaign ")
+	input.SetBorderColor(tcell.ColorGold)
+	input.SetTitleColor(tcell.ColorGold)
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(input, 3, 0, true).
+			AddItem(nil, 0, 1, false), 72, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	input.SetDoneFunc(func(key tcell.Key) {
+		ui.pages.RemovePage("campaign-save")
+		ui.app.SetFocus(ui.list)
+		if key == tcell.KeyEscape || key != tcell.KeyEnter {
+			return
+		}
+		name := strings.TrimSpace(input.GetText())
+		if name == "" {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid campaign name[-:-]  %s", helpText))
+			return
+		}
+		if strings.ContainsAny(name, "/\\") {
+			ui.status.SetText(fmt.Sprintf(" [white:red] campaign name must not contain path separators[-:-]  %s", helpText))
+			return
+		}
+		if err := ui.saveCampaign(name); err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] save campaign error[-:-] %v  %s", err, helpText))
+			return
+		}
+		ui.status.SetText(fmt.Sprintf(" [black:gold] campaign saved[-:-] %s  %s", name, helpText))
+	})
+
+	ui.pages.AddPage("campaign-save", modal, true, true)
+	ui.app.SetFocus(input)
+}
+
+func (ui *UI) saveCampaign(name string) error {
+	dir := filepath.Join(lazy5eAppDir(), name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create campaign dir: %w", err)
+	}
+	if err := ui.saveEncountersAs(filepath.Join(dir, "encounters.yaml")); err != nil {
+		return fmt.Errorf("save encounters: %w", err)
+	}
+	if err := ui.saveDiceResultsAs(filepath.Join(dir, "dice.yaml")); err != nil {
+		return fmt.Errorf("save dice: %w", err)
+	}
+	content := strings.TrimSpace(ui.treasureText)
+	if content != "" && !strings.EqualFold(content, "no treasure generated.") {
+		if err := os.WriteFile(filepath.Join(dir, "treasure.yaml"), []byte(content+"\n"), 0o644); err != nil {
+			return fmt.Errorf("save treasure: %w", err)
+		}
+	}
+	return nil
+}
+
+func (ui *UI) openCampaignLoadModal() {
+	appDir := lazy5eAppDir()
+	entries, err := os.ReadDir(appDir)
+	if err != nil {
+		ui.status.SetText(fmt.Sprintf(" [white:red] cannot read app dir[-:-] %v  %s", err, helpText))
+		return
+	}
+	var dirs []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		dirs = append(dirs, e.Name())
+	}
+	if len(dirs) == 0 {
+		ui.status.SetText(fmt.Sprintf(" [white:red] no campaigns found[-:-]  %s", helpText))
+		return
+	}
+
+	list := tview.NewList()
+	list.SetBorder(true)
+	list.SetTitle(" Load Campaign (Enter=load, Esc=cancel) ")
+	list.SetBorderColor(tcell.ColorGold)
+	list.SetTitleColor(tcell.ColorGold)
+	list.SetMainTextColor(tcell.ColorWhite)
+	list.SetSelectedTextColor(tcell.ColorBlack)
+	list.SetSelectedBackgroundColor(tcell.ColorGold)
+	list.ShowSecondaryText(false)
+	for _, d := range dirs {
+		list.AddItem(d, "", 0, nil)
+	}
+
+	ui.campaignLoadVisible = true
+
+	closeModal := func() {
+		ui.pages.RemovePage("campaign-load")
+		ui.campaignLoadVisible = false
+		ui.app.SetFocus(ui.list)
+	}
+
+	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			closeModal()
+			return nil
+		}
+		return event
+	})
+
+	list.SetSelectedFunc(func(idx int, _ string, _ string, _ rune) {
+		if idx < 0 || idx >= len(dirs) {
+			return
+		}
+		name := dirs[idx]
+		closeModal()
+		if err := ui.loadCampaign(name); err != nil {
+			ui.status.SetText(fmt.Sprintf(" [white:red] load campaign error[-:-] %v  %s", err, helpText))
+			return
+		}
+		ui.status.SetText(fmt.Sprintf(" [black:gold] campaign loaded[-:-] %s  %s", name, helpText))
+	})
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(list, min(len(dirs)+2, 20), 0, true).
+			AddItem(nil, 0, 1, false), 60, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	ui.pages.AddPage("campaign-load", modal, true, true)
+	ui.app.SetFocus(list)
+}
+
+func (ui *UI) loadCampaign(name string) error {
+	dir := filepath.Join(lazy5eAppDir(), name)
+	encPath := filepath.Join(dir, "encounters.yaml")
+	if fileExists(encPath) {
+		prev := ui.encountersPath
+		ui.encountersPath = encPath
+		if err := ui.loadEncounters(); err != nil {
+			ui.encountersPath = prev
+			return fmt.Errorf("load encounters: %w", err)
+		}
+		ui.encounterUndo = ui.encounterUndo[:0]
+		ui.encounterRedo = ui.encounterRedo[:0]
+		ui.renderEncounterList()
+		if len(ui.encounterItems) > 0 {
+			ui.encounter.SetCurrentItem(0)
+			ui.renderDetailByEncounterIndex(0)
+		}
+	}
+	dicePath := filepath.Join(dir, "dice.yaml")
+	if fileExists(dicePath) {
+		snap := DiceUndoState{
+			Items:    append([]DiceResult(nil), ui.diceLog...),
+			Selected: ui.dice.GetCurrentItem(),
+		}
+		ui.diceUndo = append(ui.diceUndo, snap)
+		ui.diceRedo = ui.diceRedo[:0]
+		prev := ui.dicePath
+		ui.dicePath = dicePath
+		if err := ui.loadDiceResults(); err != nil {
+			ui.dicePath = prev
+			return fmt.Errorf("load dice: %w", err)
+		}
+	}
+	treePath := filepath.Join(dir, "treasure.yaml")
+	if fileExists(treePath) {
+		b, err := os.ReadFile(treePath)
+		if err != nil {
+			return fmt.Errorf("load treasure: %w", err)
+		}
+		ui.treasureText = strings.TrimSpace(string(b))
+		ui.detailTreasure.SetText(ui.treasureText)
+		ui.detailTreasure.ScrollToBeginning()
+	}
+	return nil
 }
