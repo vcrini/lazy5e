@@ -39,6 +39,7 @@ const (
 	lastBuildFile         = ".character_build_last_path"
 	filtersStateFile      = ".filters_state.yaml"
 	descScrollStateFile   = ".description_scroll.yaml"
+	defaultNotesFile      = "notes.yml"
 )
 
 var (
@@ -96,7 +97,13 @@ const (
 	BrowseBooks
 	BrowseAdventures
 	BrowseRandom
+	BrowseNotes
 )
+
+type Note struct {
+	Title   string `yaml:"title"`
+	Content string `yaml:"content"`
+}
 
 type Monster struct {
 	ID          int
@@ -590,6 +597,10 @@ type UI struct {
 	dicePath        string
 	randomPath      string
 	buildPath       string
+	notesPath       string
+
+	notes           []Note
+	noteEditArea    *tview.TextArea
 	encounterUndo   []EncounterUndoState
 	encounterRedo   []EncounterUndoState
 	diceUndo        []DiceUndoState
@@ -1033,6 +1044,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	ui.modeFilters[BrowseBooks] = PersistedFilterMode{}
 	ui.modeFilters[BrowseAdventures] = PersistedFilterMode{}
 	ui.modeFilters[BrowseRandom] = PersistedFilterMode{}
+	ui.modeFilters[BrowseNotes] = PersistedFilterMode{}
 	if err := ui.loadFilterStates(); err != nil {
 		ui.status.SetText(fmt.Sprintf(" [white:red] loading error filters[-:-] %v  %s", err, helpText))
 	}
@@ -1076,6 +1088,10 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			}
 		}
 
+		if ui.noteEditArea != nil && focus == ui.noteEditArea {
+			// Note editor: let the TextArea handle all keys itself.
+			return event
+		}
 		if ui.addCustomVisible {
 			// While add-custom modal is open, do not process global shortcuts.
 			return event
@@ -1188,6 +1204,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			ui.toggleFullscreenForFocus(focus)
 			return nil
 		case event.Key() == tcell.KeyRune && event.Rune() == 'q':
+			ui.saveNotes()
 			ui.app.Stop()
 			return nil
 		case event.Key() == tcell.KeyRune && event.Rune() == '/':
@@ -1264,6 +1281,13 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 				ui.openCreateCharacterFromClassForm()
 				return nil
 			}
+			if ui.browseMode == BrowseNotes {
+				ui.openAddNoteModal()
+				return nil
+			}
+			return nil
+		case focus == ui.list && ui.browseMode == BrowseNotes && event.Key() == tcell.KeyRune && event.Rune() == 'd':
+			ui.deleteNote(ui.list.GetCurrentItem())
 			return nil
 		case focus == ui.list && ui.browseMode == BrowseRandom && event.Key() == tcell.KeyRune && event.Rune() == 'g':
 			ui.generateRandomDungeonRoom()
@@ -1320,6 +1344,10 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			ui.app.SetFocus(ui.nameInput)
 			return nil
 		case focus == ui.list && event.Key() == tcell.KeyRune && event.Rune() == 'e':
+			if ui.browseMode == BrowseNotes {
+				ui.openEditNoteModal(ui.list.GetCurrentItem())
+				return nil
+			}
 			if ui.browseMode == BrowseMonsters || ui.browseMode == BrowseItems || ui.browseMode == BrowseSpells || ui.browseMode == BrowseCharacters || ui.browseMode == BrowseRaces || ui.browseMode == BrowseFeats || ui.browseMode == BrowseBooks || ui.browseMode == BrowseAdventures {
 				ui.app.SetFocus(ui.envDrop)
 				return nil
@@ -1606,6 +1634,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == 'z':
 			ui.setBrowseMode(BrowseRandom)
 			return nil
+		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == 'N':
+			ui.setBrowseMode(BrowseNotes)
+			return nil
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == '[':
 			ui.cycleBrowseMode(-1)
 			return nil
@@ -1638,6 +1669,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	if err := ui.loadDiceResults(); err != nil {
 		ui.status.SetText(fmt.Sprintf(" [white:red] loading error dice[-:-] %v  %s", err, helpText))
 	}
+	ui.loadNotes()
 	ui.renderEncounterList()
 	return ui
 }
@@ -1968,6 +2000,7 @@ func (ui *UI) openPanelJumpModal(returnFocus tview.Primitive) {
 		{Label: "Manuals", Key: 'b', Hint: "accanto: 9 Feats, v Adventures", Go: func() { ui.setBrowseMode(BrowseBooks); ui.app.SetFocus(ui.list) }},
 		{Label: "Adventures", Key: 'v', Hint: "accanto: b Manuals, z Random", Go: func() { ui.setBrowseMode(BrowseAdventures); ui.app.SetFocus(ui.list) }},
 		{Label: "Random", Key: 'z', Hint: "accanto: v Adventures, 4 Monsters", Go: func() { ui.setBrowseMode(BrowseRandom); ui.app.SetFocus(ui.list) }},
+		{Label: "Notes", Key: 'n', Hint: "accanto: z Random", Go: func() { ui.setBrowseMode(BrowseNotes); ui.app.SetFocus(ui.list) }},
 	}
 
 	list := tview.NewList().
@@ -2275,6 +2308,15 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 				"  n / e / s / c / t : focus on Name / Ability / Source(multi) / Size / Lineage\n" +
 				"  [ / ] : switch Monsters/Items/Spells/Characters/Races/Feats panel\n" +
 				"  PgUp / PgDn : scroll Description panel\n"
+		}
+		if ui.browseMode == BrowseNotes {
+			return header +
+				"[black:gold]Notes[-:-]\n" +
+				"  a : add new note\n" +
+				"  e : edit selected note content (Ctrl+S save, Esc cancel)\n" +
+				"  d : delete selected note\n" +
+				"  j / k (or arrows) : navigate notes\n" +
+				"  n : focus on Title filter\n"
 		}
 		return header +
 			"[black:gold]Feats[-:-]\n" +
@@ -3728,6 +3770,8 @@ func (ui *UI) browseModeName() string {
 		return "Adventures"
 	case BrowseRandom:
 		return "Random"
+	case BrowseNotes:
+		return "Notes"
 	default:
 		return "Monsters"
 	}
@@ -3751,6 +3795,8 @@ func (ui *UI) activeEntries() []Monster {
 		return ui.adventures
 	case BrowseRandom:
 		return ui.randoms
+	case BrowseNotes:
+		return ui.notesToMonsters()
 	default:
 		return ui.monsters
 	}
@@ -3984,6 +4030,16 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.sourceOptions = append(ui.sourceOptions, keysSorted(seenSource)...)
 		ui.crOptions = append(ui.crOptions, keysSorted(seenYear)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenAuthor)...)
+	case BrowseNotes:
+		ui.nameInput.SetLabel(" Title ")
+		ui.envDrop.SetLabel(" — ")
+		ui.sourceDrop.SetLabel(" — ")
+		ui.crDrop.SetLabel(" — ")
+		ui.typeDrop.SetLabel(" — ")
+		ui.envOptions = []string{"All"}
+		ui.sourceOptions = []string{"All"}
+		ui.crOptions = []string{"All"}
+		ui.typeOptions = []string{"All"}
 	case BrowseRandom:
 		ui.nameInput.SetLabel(" Name ")
 		ui.envDrop.SetLabel(" Category ")
@@ -4398,7 +4454,7 @@ func (ui *UI) collectMonsterTypeOptions() []string {
 }
 
 func (ui *UI) updateBrowsePanelTitle() {
-	count := 9
+	count := 10
 	prev := BrowseMode((int(ui.browseMode) - 1 + count) % count)
 	next := BrowseMode((int(ui.browseMode) + 1) % count)
 	ui.monstersPanel.SetTitle(fmt.Sprintf(" [2]-%s  [:%s  ]:%s ", ui.browseModeName(), browseModeLabel(prev), browseModeLabel(next)))
@@ -4408,7 +4464,7 @@ func (ui *UI) cycleBrowseMode(delta int) {
 	if delta == 0 {
 		return
 	}
-	count := 9
+	count := 10
 	next := (int(ui.browseMode) + delta) % count
 	if next < 0 {
 		next += count
@@ -4434,6 +4490,8 @@ func browseModeLabel(mode BrowseMode) string {
 		return "Adventures"
 	case BrowseRandom:
 		return "Random"
+	case BrowseNotes:
+		return "Notes"
 	default:
 		return "Monsters"
 	}
@@ -4450,6 +4508,177 @@ func (ui *UI) setBrowseMode(mode BrowseMode) {
 	ui.updateBrowsePanelTitle()
 	ui.applyFilters()
 	ui.status.SetText(fmt.Sprintf(" [black:gold]browse[-:-] %s  %s", ui.browseModeName(), helpText))
+}
+
+func (ui *UI) saveNotes() {
+	path := ui.notesPath
+	if path == "" {
+		path = defaultNotesPath()
+		ui.notesPath = path
+	}
+	type notesFile struct {
+		Notes []Note `yaml:"notes"`
+	}
+	b, err := yaml.Marshal(notesFile{Notes: ui.notes})
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(path, b, 0o644)
+}
+
+func (ui *UI) notesToMonsters() []Monster {
+	out := make([]Monster, len(ui.notes))
+	for i, n := range ui.notes {
+		out[i] = Monster{ID: i, Name: n.Title}
+	}
+	return out
+}
+
+func (ui *UI) loadNotes() {
+	path := ui.notesPath
+	if path == "" {
+		path = defaultNotesPath()
+		ui.notesPath = path
+	}
+	if !fileExists(path) {
+		return
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	type notesFile struct {
+		Notes []Note `yaml:"notes"`
+	}
+	var nf notesFile
+	if err := yaml.Unmarshal(b, &nf); err != nil {
+		return
+	}
+	ui.notes = nf.Notes
+}
+
+func (ui *UI) rebuildNotesList() {
+	ui.applyFilters()
+	idx := ui.list.GetCurrentItem()
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= ui.list.GetItemCount() {
+		idx = ui.list.GetItemCount() - 1
+	}
+	ui.list.SetCurrentItem(idx)
+	ui.renderDetailByListIndex(idx)
+}
+
+func (ui *UI) openAddNoteModal() {
+	titleInput := tview.NewInputField().
+		SetLabel(" Title: ").
+		SetFieldWidth(40)
+	titleInput.SetBorder(true).
+		SetTitle(" New Note ").
+		SetTitleColor(tcell.ColorGold).
+		SetBorderColor(tcell.ColorGold)
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(titleInput, 3, 0, true).
+			AddItem(nil, 0, 1, false), 60, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	titleInput.SetDoneFunc(func(key tcell.Key) {
+		ui.pages.RemovePage("note-add")
+		ui.app.SetFocus(ui.list)
+		if key != tcell.KeyEnter {
+			return
+		}
+		title := strings.TrimSpace(titleInput.GetText())
+		if title == "" {
+			return
+		}
+		ui.notes = append(ui.notes, Note{Title: title})
+		ui.saveNotes()
+		ui.rebuildNotesList()
+		ui.list.SetCurrentItem(ui.list.GetItemCount() - 1)
+		ui.renderDetailByListIndex(ui.list.GetCurrentItem())
+		// open editor immediately for the new note
+		ui.openEditNoteModal(ui.list.GetCurrentItem())
+	})
+
+	ui.pages.AddPage("note-add", modal, true, true)
+	ui.app.SetFocus(titleInput)
+}
+
+func (ui *UI) openEditNoteModal(listIdx int) {
+	if listIdx < 0 || listIdx >= len(ui.filtered) {
+		return
+	}
+	noteIdx := ui.filtered[listIdx]
+	if noteIdx < 0 || noteIdx >= len(ui.notes) {
+		return
+	}
+
+	area := tview.NewTextArea().
+		SetWrap(true).
+		SetWordWrap(true).
+		SetText(ui.notes[noteIdx].Content, false)
+	area.SetBorder(true).
+		SetTitle(fmt.Sprintf(" Edit: %s  (Ctrl+S save · Esc cancel) ", tview.Escape(ui.notes[noteIdx].Title))).
+		SetTitleColor(tcell.ColorGold).
+		SetBorderColor(tcell.ColorGold)
+
+	modal := tview.NewFlex().
+		AddItem(nil, 2, 0, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 1, 0, false).
+			AddItem(area, 0, 1, true).
+			AddItem(nil, 1, 0, false), 0, 1, true).
+		AddItem(nil, 2, 0, false)
+
+	ui.noteEditArea = area
+
+	save := func() {
+		ui.notes[noteIdx].Content = area.GetText()
+		ui.saveNotes()
+		ui.noteEditArea = nil
+		ui.pages.RemovePage("note-edit")
+		ui.app.SetFocus(ui.list)
+		ui.renderDetailByListIndex(listIdx)
+	}
+	cancel := func() {
+		ui.noteEditArea = nil
+		ui.pages.RemovePage("note-edit")
+		ui.app.SetFocus(ui.list)
+	}
+
+	area.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyCtrlS {
+			save()
+			return nil
+		}
+		if event.Key() == tcell.KeyEscape {
+			cancel()
+			return nil
+		}
+		return event
+	})
+
+	ui.pages.AddPage("note-edit", modal, true, true)
+	ui.app.SetFocus(area)
+}
+
+func (ui *UI) deleteNote(listIdx int) {
+	if listIdx < 0 || listIdx >= len(ui.filtered) {
+		return
+	}
+	noteIdx := ui.filtered[listIdx]
+	if noteIdx < 0 || noteIdx >= len(ui.notes) {
+		return
+	}
+	ui.notes = append(ui.notes[:noteIdx], ui.notes[noteIdx+1:]...)
+	ui.saveNotes()
+	ui.rebuildNotesList()
 }
 
 func (ui *UI) applyFilters() {
@@ -4558,10 +4787,27 @@ func (ui *UI) renderDetailByListIndex(listIndex int) {
 		ui.renderDetailByAdventureIndex(activeIndex)
 	case BrowseRandom:
 		ui.renderDetailByRandomIndex(activeIndex)
+	case BrowseNotes:
+		ui.renderDetailByNoteIndex(activeIndex)
 	default:
 		ui.renderDetailByMonsterIndex(activeIndex)
 	}
 	ui.restoreDescriptionScrollForKey(descKey)
+}
+
+func (ui *UI) renderDetailByNoteIndex(idx int) {
+	if idx < 0 || idx >= len(ui.notes) {
+		ui.detailMeta.SetText("No note selected.")
+		ui.detailRaw.SetText("")
+		ui.rawText = ""
+		return
+	}
+	n := ui.notes[idx]
+	ui.detailMeta.SetText(fmt.Sprintf("[gold]%s[-]", tview.Escape(n.Title)))
+	ui.detailRaw.SetText(tview.Escape(n.Content))
+	ui.rawText = n.Content
+	ui.currentDescKey = fmt.Sprintf("note-%d", idx)
+	ui.detailBottom.SwitchToPage("description")
 }
 
 func (ui *UI) renderDetailByEncounterIndex(encounterIndex int) {
@@ -11449,6 +11695,7 @@ func lazy5eAppDir() string {
 }
 
 func defaultEncountersPath() string  { return filepath.Join(lazy5eAppDir(), defaultEncountersFile) }
+func defaultNotesPath() string       { return filepath.Join(lazy5eAppDir(), defaultNotesFile) }
 func lastEncountersPathFile() string { return filepath.Join(lazy5eAppDir(), lastEncountersFile) }
 func defaultDicePath() string        { return filepath.Join(lazy5eAppDir(), defaultDiceFile) }
 func lastDicePathFile() string       { return filepath.Join(lazy5eAppDir(), lastDiceFile) }
@@ -14792,6 +15039,8 @@ func (ui *UI) saveCampaign(name string) error {
 			return fmt.Errorf("save treasure: %w", err)
 		}
 	}
+	ui.notesPath = filepath.Join(dir, defaultNotesFile)
+	ui.saveNotes()
 	return nil
 }
 
@@ -15011,6 +15260,11 @@ func (ui *UI) loadCampaign(name string) error {
 		ui.treasureText = strings.TrimSpace(string(b))
 		ui.detailTreasure.SetText(ui.treasureText)
 		ui.detailTreasure.ScrollToBeginning()
+	}
+	ui.notesPath = filepath.Join(dir, defaultNotesFile)
+	ui.loadNotes()
+	if ui.browseMode == BrowseNotes {
+		ui.rebuildNotesList()
 	}
 	return nil
 }
