@@ -598,6 +598,7 @@ type UI struct {
 	randomPath      string
 	buildPath       string
 	notesPath       string
+	currentCampaign string
 
 	notes           []Note
 	noteEditArea    *tview.TextArea
@@ -4507,6 +4508,15 @@ func (ui *UI) setBrowseMode(mode BrowseMode) {
 	ui.applyModeFilters(ui.browseMode)
 	ui.updateBrowsePanelTitle()
 	ui.applyFilters()
+	ui.status.SetText(fmt.Sprintf(" [black:gold]browse[-:-] %s  %s", ui.browseModeName(), helpText))
+}
+
+func (ui *UI) updateHelpText() {
+	if ui.currentCampaign != "" {
+		helpText = fmt.Sprintf("%s[gray]│ %s[-] ", helpTextBase, ui.currentCampaign)
+	} else {
+		helpText = helpTextBase
+	}
 	ui.status.SetText(fmt.Sprintf(" [black:gold]browse[-:-] %s  %s", ui.browseModeName(), helpText))
 }
 
@@ -15041,6 +15051,8 @@ func (ui *UI) saveCampaign(name string) error {
 	}
 	ui.notesPath = filepath.Join(dir, defaultNotesFile)
 	ui.saveNotes()
+	ui.currentCampaign = name
+	ui.updateHelpText()
 	return nil
 }
 
@@ -15266,5 +15278,7 @@ func (ui *UI) loadCampaign(name string) error {
 	if ui.browseMode == BrowseNotes {
 		ui.rebuildNotesList()
 	}
+	ui.currentCampaign = name
+	ui.updateHelpText()
 	return nil
 }
