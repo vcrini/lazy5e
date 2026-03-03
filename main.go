@@ -7510,8 +7510,8 @@ func generateCharacterSpellSelection(cl Monster, level int, spells []Monster) st
 			knownN = 20
 		}
 	}
-	levelled := pickRandomSpellNames(levelledPool, knownN)
-	if len(cantrips) == 0 && len(levelled) == 0 {
+	levelledMonsters := pickRandomSpells(levelledPool, knownN)
+	if len(cantrips) == 0 && len(levelledMonsters) == 0 {
 		return ""
 	}
 
@@ -7519,8 +7519,26 @@ func generateCharacterSpellSelection(cl Monster, level int, spells []Monster) st
 	if len(cantrips) > 0 {
 		fmt.Fprintf(b, "Cantrips (%d): %s\n", len(cantrips), strings.Join(cantrips, ", "))
 	}
-	if len(levelled) > 0 {
-		fmt.Fprintf(b, "Leveled (%d, up to level %d): %s\n", len(levelled), maxLvl, strings.Join(levelled, ", "))
+	if len(levelledMonsters) > 0 {
+		// Group by spell level
+		byLevel := map[int][]string{}
+		for _, sp := range levelledMonsters {
+			lv, ok := spellLevelNumber(sp)
+			if !ok {
+				continue
+			}
+			byLevel[lv] = append(byLevel[lv], strings.TrimSpace(sp.Name))
+		}
+		levels := make([]int, 0, len(byLevel))
+		for lv := range byLevel {
+			levels = append(levels, lv)
+		}
+		sort.Ints(levels)
+		for _, lv := range levels {
+			names := byLevel[lv]
+			sort.Strings(names)
+			fmt.Fprintf(b, "Level %d: %s\n", lv, strings.Join(names, ", "))
+		}
 	}
 	return strings.TrimSpace(b.String())
 }
@@ -7570,6 +7588,33 @@ func pickRandomSpellNames(spells []Monster, count int) []string {
 		}
 	}
 	sort.Strings(out)
+	return out
+}
+
+func pickRandomSpells(spells []Monster, count int) []Monster {
+	if count <= 0 || len(spells) == 0 {
+		return nil
+	}
+	if count > len(spells) {
+		count = len(spells)
+	}
+	perm := rand.Perm(len(spells))
+	out := make([]Monster, 0, count)
+	seen := map[string]struct{}{}
+	for _, idx := range perm {
+		name := strings.ToLower(strings.TrimSpace(spells[idx].Name))
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, spells[idx])
+		if len(out) >= count {
+			break
+		}
+	}
 	return out
 }
 

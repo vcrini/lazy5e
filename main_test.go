@@ -364,8 +364,8 @@ func TestGenerateCharacterSpellSelection(t *testing.T) {
 	if !strings.Contains(out, "Cantrips") {
 		t.Fatalf("expected cantrips in output: %q", out)
 	}
-	if !strings.Contains(out, "Leveled") {
-		t.Fatalf("expected leveled spells in output: %q", out)
+	if !strings.Contains(out, "Level ") {
+		t.Fatalf("expected leveled spells grouped by level in output: %q", out)
 	}
 }
 
