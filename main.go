@@ -7788,12 +7788,156 @@ func plainTable(m map[string]any) string {
 	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
+var reToolsTag = regexp.MustCompile(`\{@(\w+)\s*([^}]*)\}`)
+
+// stripTags converts 5etools inline tags (e.g. {@atkr m}, {@damage 1d4 + 2})
+// to plain readable text matching the Monster Manual style.
+func stripTags(s string) string {
+	return reToolsTag.ReplaceAllStringFunc(s, func(match string) string {
+		m := reToolsTag.FindStringSubmatch(match)
+		if len(m) < 3 {
+			return match
+		}
+		tag, content := m[1], strings.TrimSpace(m[2])
+		switch tag {
+		// ── Attack rolls ────────────────────────────────────────────────
+		case "atkr":
+			switch content {
+			case "m":
+				return "Melee Attack Roll:"
+			case "r":
+				return "Ranged Attack Roll:"
+			case "m,r", "r,m":
+				return "Melee or Ranged Attack Roll:"
+			default:
+				return "Attack Roll:"
+			}
+		case "atk":
+			switch content {
+			case "m":
+				return "Melee Attack Roll:"
+			case "r":
+				return "Ranged Attack Roll:"
+			case "mw":
+				return "Melee Weapon Attack:"
+			case "rw":
+				return "Ranged Weapon Attack:"
+			case "ms":
+				return "Melee Spell Attack:"
+			case "rs":
+				return "Ranged Spell Attack:"
+			case "mw,rw", "rw,mw":
+				return "Melee or Ranged Weapon Attack:"
+			case "ms,rs", "rs,ms":
+				return "Melee or Ranged Spell Attack:"
+			case "m,r", "r,m":
+				return "Melee or Ranged Attack Roll:"
+			default:
+				return "Attack:"
+			}
+		// ── Hit / damage / DC ────────────────────────────────────────────
+		case "hit":
+			n, err := strconv.Atoi(content)
+			if err != nil {
+				return "+" + content
+			}
+			if n >= 0 {
+				return fmt.Sprintf("+%d", n)
+			}
+			return fmt.Sprintf("%d", n)
+		case "h":
+			return "Hit: " // trailing space – tag is immediately followed by the number
+		case "hom":
+			return "Hit or Miss: "
+		case "damage":
+			d := strings.ReplaceAll(content, " + ", "+")
+			d = strings.ReplaceAll(d, " - ", "-")
+			return d
+		case "dc":
+			return "DC " + content
+		// ── 2024 action-block tags ────────────────────────────────────────
+		case "actSave":
+			ability := map[string]string{
+				"str": "Strength", "dex": "Dexterity", "con": "Constitution",
+				"int": "Intelligence", "wis": "Wisdom", "cha": "Charisma",
+			}
+			if full, ok := ability[content]; ok {
+				return full + " Saving Throw:"
+			}
+			return strings.ToUpper(content[:1]) + content[1:] + " Saving Throw:"
+		case "actSaveFail":
+			switch content {
+			case "":
+				return "Fail:"
+			case "1":
+				return "Fail (first save):"
+			case "2":
+				return "Fail (repeated save):"
+			default:
+				return "Fail:"
+			}
+		case "actSaveSuccess":
+			return "Success:"
+		case "actSaveSuccessOrFail":
+			return "Success or Fail:"
+		case "actTrigger":
+			return "Trigger:"
+		case "actResponse":
+			return "Response:"
+		case "hitYourSpellAttack":
+			if content != "" {
+				return content
+			}
+			return "Spell Attack Roll: your spell attack modifier"
+		// ── Recharge ─────────────────────────────────────────────────────
+		case "recharge":
+			if content == "" {
+				return "(Recharge 6)"
+			}
+			return fmt.Sprintf("(Recharge %s–6)", content)
+		// ── Dice expressions ─────────────────────────────────────────────
+		case "dice":
+			parts := strings.SplitN(content, ";", 2)
+			return strings.TrimSpace(parts[0])
+		case "scaledice", "scaledamage":
+			parts := strings.SplitN(content, "|", 2)
+			return strings.TrimSpace(parts[0])
+		case "chance":
+			return content + " percent"
+		case "skillCheck":
+			parts := strings.Fields(content)
+			if len(parts) >= 2 {
+				skill := strings.Title(strings.ReplaceAll(parts[0], "_", " "))
+				return fmt.Sprintf("DC %s %s check", parts[1], skill)
+			}
+			return strings.ReplaceAll(content, "_", " ")
+		// ── Text-formatting tags ──────────────────────────────────────────
+		case "b", "bold", "i", "italic", "s", "u", "sup", "sub", "color":
+			// {@color text|color} – only the text part
+			parts := strings.SplitN(content, "|", 2)
+			return strings.TrimSpace(parts[0])
+		case "note":
+			return ""
+		// ── Everything else: reference tags ──────────────────────────────
+		// condition, spell, creature, item, skill, sense, feat, class,
+		// variantrule, action, filter, table, hazard, status, quickref, …
+		default:
+			display := strings.TrimSpace(strings.SplitN(content, "|", 2)[0])
+			// Strip area-of-effect suffixes: "Cone [Area of Effect]" → "Cone"
+			if idx := strings.Index(display, " ["); idx >= 0 {
+				display = display[:idx]
+			}
+			return display
+		}
+	})
+}
+
 func plainAny(v any) string {
 	switch x := v.(type) {
 	case nil:
 		return ""
 	case string:
-		return strings.TrimSpace(x)
+		return strings.TrimSpace(stripTags(x))
 	case int, int8, int16, int32, int64, float32, float64, bool:
 		return strings.TrimSpace(fmt.Sprintf("%v", x))
 	case []string:
