@@ -1132,7 +1132,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			return event
 		}
 		if ui.campaignLoadVisible {
-			if event.Key() == tcell.KeyEscape {
+			if event.Key() == tcell.KeyEscape && !focusIsInputField {
 				ui.pages.RemovePage("campaign-load")
 				ui.campaignLoadVisible = false
 				ui.app.SetFocus(ui.list)
@@ -1171,7 +1171,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case focus == ui.dice && event.Key() == tcell.KeyRune && event.Rune() == 'd':
 			ui.deleteSelectedDiceResult()
 			return nil
-		case focus == ui.dice && event.Key() == tcell.KeyRune && event.Rune() == 'c':
+		case focus == ui.dice && event.Key() == tcell.KeyRune && event.Rune() == 'D':
 			ui.clearDiceResults()
 			return nil
 		case focus == ui.dice && event.Key() == tcell.KeyRune && event.Rune() == 's':
@@ -1611,6 +1611,11 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			return nil
 		case !focusIsInputField && event.Key() == tcell.KeyRune && event.Rune() == ']':
 			ui.cycleBrowseMode(1)
+			return nil
+		case focus == ui.detailTreasure && event.Key() == tcell.KeyRune && event.Rune() == 'D':
+			ui.treasureText = "No treasure generated."
+			ui.detailTreasure.SetText(ui.treasureText)
+			ui.detailTreasure.ScrollToBeginning()
 			return nil
 		case focus != ui.nameInput && event.Key() == tcell.KeyRune && event.Rune() == 'j':
 			return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
@@ -2119,7 +2124,7 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  A : re-roll all rows in history\n" +
 			"  e : edit + re-roll selected row\n" +
 			"  d : delete selected row\n" +
-			"  c : clear all rows\n" +
+			"  D : clear all rows\n" +
 			"  s : save dice results (save as)\n" +
 			"  l : load dice results (load)\n" +
 			"  f : fullscreen on/off Dice panel\n" +
@@ -2285,10 +2290,16 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  / : search text in current Description\n" +
 			"  n / N : next / previous search match\n" +
 			"  j / k (or arrows) : scroll content\n"
-	case ui.detailMeta, ui.detailTreasure:
+	case ui.detailMeta:
 		return header +
-			"[black:gold]Details/Treasure[-:-]\n" +
+			"[black:gold]Details[-:-]\n" +
 			"  d : switch focus between Details and Treasure\n" +
+			"  j / k (or arrows) : scroll content\n"
+	case ui.detailTreasure:
+		return header +
+			"[black:gold]Treasure[-:-]\n" +
+			"  d : switch focus between Details and Treasure\n" +
+			"  D : clear treasure content\n" +
 			"  j / k (or arrows) : scroll content\n"
 	case ui.nameInput:
 		return header +
@@ -14594,21 +14605,23 @@ func (ui *UI) saveCampaign(name string) error {
 
 func (ui *UI) openCampaignLoadModal() {
 	appDir := lazy5eAppDir()
-	entries, err := os.ReadDir(appDir)
-	if err != nil {
-		ui.status.SetText(fmt.Sprintf(" [white:red] cannot read app dir[-:-] %v  %s", err, helpText))
-		return
-	}
-	var dirs []string
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
+
+	buildDirs := func() []string {
+		entries, err := os.ReadDir(appDir)
+		if err != nil {
+			return nil
 		}
-		if strings.HasPrefix(e.Name(), ".") {
-			continue
+		var out []string
+		for _, e := range entries {
+			if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			out = append(out, e.Name())
 		}
-		dirs = append(dirs, e.Name())
+		return out
 	}
+
+	dirs := buildDirs()
 	if len(dirs) == 0 {
 		ui.status.SetText(fmt.Sprintf(" [white:red] no campaigns found[-:-]  %s", helpText))
 		return
@@ -14616,16 +14629,28 @@ func (ui *UI) openCampaignLoadModal() {
 
 	list := tview.NewList()
 	list.SetBorder(true)
-	list.SetTitle(" Load Campaign (Enter=load, Esc=cancel) ")
+	list.SetTitle(" Load Campaign (Enter=load, r=rename, D=delete, Esc=cancel) ")
 	list.SetBorderColor(tcell.ColorGold)
 	list.SetTitleColor(tcell.ColorGold)
 	list.SetMainTextColor(tcell.ColorWhite)
 	list.SetSelectedTextColor(tcell.ColorBlack)
 	list.SetSelectedBackgroundColor(tcell.ColorGold)
 	list.ShowSecondaryText(false)
-	for _, d := range dirs {
-		list.AddItem(d, "", 0, nil)
+
+	render := func() {
+		cur := list.GetCurrentItem()
+		list.Clear()
+		for _, d := range dirs {
+			list.AddItem(d, "", 0, nil)
+		}
+		if cur >= len(dirs) {
+			cur = len(dirs) - 1
+		}
+		if cur >= 0 {
+			list.SetCurrentItem(cur)
+		}
 	}
+	render()
 
 	ui.campaignLoadVisible = true
 
@@ -14638,6 +14663,46 @@ func (ui *UI) openCampaignLoadModal() {
 	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEscape {
 			closeModal()
+			return nil
+		}
+		if event.Key() != tcell.KeyRune {
+			return event
+		}
+		switch event.Rune() {
+		case 'D':
+			idx := list.GetCurrentItem()
+			if idx < 0 || idx >= len(dirs) {
+				return nil
+			}
+			name := dirs[idx]
+			if err := os.RemoveAll(filepath.Join(appDir, name)); err != nil {
+				ui.status.SetText(fmt.Sprintf(" [white:red] delete campaign error[-:-] %v  %s", err, helpText))
+				return nil
+			}
+			dirs = append(dirs[:idx], dirs[idx+1:]...)
+			if len(dirs) == 0 {
+				closeModal()
+				ui.status.SetText(fmt.Sprintf(" [black:gold] campaign deleted[-:-] %s  %s", name, helpText))
+				return nil
+			}
+			render()
+			ui.status.SetText(fmt.Sprintf(" [black:gold] campaign deleted[-:-] %s  %s", name, helpText))
+			return nil
+		case 'r':
+			idx := list.GetCurrentItem()
+			if idx < 0 || idx >= len(dirs) {
+				return nil
+			}
+			oldName := dirs[idx]
+			ui.openCampaignRenameInput(oldName, list, func(newName string) {
+				if err := os.Rename(filepath.Join(appDir, oldName), filepath.Join(appDir, newName)); err != nil {
+					ui.status.SetText(fmt.Sprintf(" [white:red] rename campaign error[-:-] %v  %s", err, helpText))
+					return
+				}
+				dirs[idx] = newName
+				render()
+				ui.status.SetText(fmt.Sprintf(" [black:gold] campaign renamed[-:-] %s → %s  %s", oldName, newName, helpText))
+			})
 			return nil
 		}
 		return event
@@ -14666,6 +14731,50 @@ func (ui *UI) openCampaignLoadModal() {
 
 	ui.pages.AddPage("campaign-load", modal, true, true)
 	ui.app.SetFocus(list)
+}
+
+func (ui *UI) openCampaignRenameInput(currentName string, returnFocus tview.Primitive, onDone func(newName string)) {
+	input := tview.NewInputField().
+		SetLabel("New name: ").
+		SetFieldWidth(40)
+	input.SetLabelColor(tcell.ColorGold)
+	input.SetFieldBackgroundColor(tcell.ColorWhite)
+	input.SetFieldTextColor(tcell.ColorBlack)
+	input.SetFieldStyle(tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack))
+	input.SetBackgroundColor(tcell.ColorBlack)
+	input.SetBorder(true)
+	input.SetTitle(" Rename Campaign ")
+	input.SetBorderColor(tcell.ColorGold)
+	input.SetTitleColor(tcell.ColorGold)
+	input.SetText(currentName)
+
+	modal := tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(input, 3, 0, true).
+			AddItem(nil, 0, 1, false), 72, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	input.SetDoneFunc(func(key tcell.Key) {
+		ui.pages.RemovePage("campaign-rename")
+		ui.app.SetFocus(returnFocus)
+		if key == tcell.KeyEscape || key != tcell.KeyEnter {
+			return
+		}
+		newName := strings.TrimSpace(input.GetText())
+		if newName == "" || strings.ContainsAny(newName, "/\\") {
+			ui.status.SetText(fmt.Sprintf(" [white:red] invalid campaign name[-:-]  %s", helpText))
+			return
+		}
+		if newName == currentName {
+			return
+		}
+		onDone(newName)
+	})
+
+	ui.pages.AddPage("campaign-rename", modal, true, true)
+	ui.app.SetFocus(input)
 }
 
 func (ui *UI) loadCampaign(name string) error {
