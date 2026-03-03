@@ -6527,11 +6527,12 @@ func joinHeaderBody(header string, body string) string {
 }
 
 type generatedCharacterSheet struct {
-	Meta string
-	Body string
-	HP   int
-	AC   int
-	Init int
+	Meta      string
+	Body      string
+	SpellPlan string
+	HP        int
+	AC        int
+	Init      int
 }
 
 type backgroundProfile struct {
@@ -6655,9 +6656,7 @@ func generateCharacterSheetDataFromScores(cl Monster, rc Monster, level int, bas
 	if len(subclassLevels) > 0 {
 		fmt.Fprintf(bodyB, "Subclass Feature Levels: %s\n", strings.Join(intSliceToStrings(subclassLevels), ", "))
 	}
-	if spellPlan != "" {
-		fmt.Fprintf(bodyB, "Spellcasting Plan: %s\n", spellPlan)
-	}
+
 
 	fmt.Fprintf(bodyB, "\nAbilities\n")
 	for i := range labels {
@@ -6700,11 +6699,12 @@ func generateCharacterSheetDataFromScores(cl Monster, rc Monster, level int, bas
 		}
 	}
 	return generatedCharacterSheet{
-		Meta: metaB.String(),
-		Body: bodyB.String(),
-		HP:   hp,
-		AC:   ac,
-		Init: init,
+		Meta:      metaB.String(),
+		Body:      bodyB.String(),
+		SpellPlan: spellPlan,
+		HP:        hp,
+		AC:        ac,
+		Init:      init,
 	}
 }
 
@@ -6913,6 +6913,9 @@ func (ui *UI) generateCharacterSheetFromBuild(build CharacterBuild) (generatedCh
 	fmt.Fprintf(body, "Total Level: %d\n\n", totalLevel)
 	body.WriteString(sheet.Body)
 	if spellText := generateCharacterSpellSelection(primary, totalLevel, ui.spells); spellText != "" {
+		if sheet.SpellPlan != "" {
+			fmt.Fprintf(body, "\n\nSpellcasting Plan: %s", sheet.SpellPlan)
+		}
 		fmt.Fprintf(body, "\n\nSpells Prepared/Known\n%s", spellText)
 	}
 	if len(outBuild.Spells) > 0 {
