@@ -12148,6 +12148,10 @@ func loadMonstersFromBytes(b []byte) ([]Monster, []string, []string, []string, e
 		return nil, nil, nil, nil, errors.New("no monster found in yaml")
 	}
 
+	// Resolve _copy references (two passes to handle chained copies).
+	resolveMonstersWithCopy(ds.Monsters)
+	resolveMonstersWithCopy(ds.Monsters)
+
 	monsters := make([]Monster, 0, len(ds.Monsters))
 	envSet := map[string]struct{}{}
 	crSet := map[string]struct{}{}
@@ -12191,6 +12195,166 @@ func loadMonstersFromBytes(b []byte) ([]Monster, []string, []string, []string, e
 	})
 
 	return monsters, keysSorted(envSet), sortCR(keysSorted(crSet)), keysSorted(typeSet), nil
+}
+
+// resolveMonstersWithCopy merges fields from _copy base entries into each entry that
+// references one, then applies any _mod transformations. Fields already present on the
+// copying entry are never overwritten.
+func resolveMonstersWithCopy(rawEntries []map[string]any) {
+	lookup := make(map[string]map[string]any, len(rawEntries))
+	for _, raw := range rawEntries {
+		name := asString(raw["name"])
+		source := asString(raw["source"])
+		if name != "" && raw["_copy"] == nil {
+			key := strings.ToLower(name) + "::" + strings.ToLower(source)
+			lookup[key] = raw
+		}
+	}
+	for i, raw := range rawEntries {
+		copySpec, hasCopy := raw["_copy"]
+		if !hasCopy {
+			continue
+		}
+		copyMap, ok := copySpec.(map[string]any)
+		if !ok {
+			continue
+		}
+		baseName := asString(copyMap["name"])
+		baseSource := asString(copyMap["source"])
+		key := strings.ToLower(baseName) + "::" + strings.ToLower(baseSource)
+		base, found := lookup[key]
+		if !found {
+			continue
+		}
+		// Copy base fields that are not already present on the entry.
+		for k, v := range base {
+			if k == "_copy" {
+				continue
+			}
+			if _, exists := rawEntries[i][k]; !exists {
+				rawEntries[i][k] = deepCopyAny(v)
+			}
+		}
+		// Apply _mod transformations.
+		if mods, hasMod := copyMap["_mod"]; hasMod {
+			applyMonsterMod(rawEntries[i], mods)
+		}
+		delete(rawEntries[i], "_copy")
+	}
+}
+
+func applyMonsterMod(target map[string]any, mods any) {
+	modMap, ok := mods.(map[string]any)
+	if !ok {
+		return
+	}
+	for field, modSpec := range modMap {
+		if field == "*" {
+			// replaceTxt on all fields is cosmetic (NPC name substitution); skip.
+			continue
+		}
+		switch v := modSpec.(type) {
+		case map[string]any:
+			applyMonsterModOp(target, field, v)
+		case []any:
+			for _, item := range v {
+				if m, ok2 := item.(map[string]any); ok2 {
+					applyMonsterModOp(target, field, m)
+				}
+			}
+		}
+	}
+}
+
+func applyMonsterModOp(target map[string]any, field string, mod map[string]any) {
+	mode := asString(mod["mode"])
+	existing := func() []any {
+		if s, ok := target[field].([]any); ok {
+			return s
+		}
+		return nil
+	}
+	switch mode {
+	case "appendArr":
+		items := mod["items"]
+		if items == nil {
+			return
+		}
+		cur := existing()
+		switch v := items.(type) {
+		case []any:
+			target[field] = append(cur, v...)
+		default:
+			target[field] = append(cur, v)
+		}
+	case "prependArr":
+		items := mod["items"]
+		if items == nil {
+			return
+		}
+		cur := existing()
+		switch v := items.(type) {
+		case []any:
+			target[field] = append(v, cur...)
+		default:
+			target[field] = append([]any{v}, cur...)
+		}
+	case "replaceArr":
+		replaceName := asString(mod["replace"])
+		newItem := mod["items"]
+		if replaceName == "" || newItem == nil {
+			return
+		}
+		cur := existing()
+		for idx, item := range cur {
+			if m, ok := item.(map[string]any); ok {
+				if strings.EqualFold(asString(m["name"]), replaceName) {
+					switch v := newItem.(type) {
+					case []any:
+						if len(v) > 0 {
+							cur[idx] = v[0]
+						}
+					default:
+						cur[idx] = v
+					}
+					break
+				}
+			}
+		}
+		target[field] = cur
+	case "removeArr":
+		name := asString(mod["names"])
+		cur := existing()
+		out := cur[:0]
+		for _, item := range cur {
+			if m, ok := item.(map[string]any); ok {
+				if strings.EqualFold(asString(m["name"]), name) {
+					continue
+				}
+			}
+			out = append(out, item)
+		}
+		target[field] = out
+	}
+}
+
+func deepCopyAny(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		cp := make(map[string]any, len(val))
+		for k, v2 := range val {
+			cp[k] = deepCopyAny(v2)
+		}
+		return cp
+	case []any:
+		cp := make([]any, len(val))
+		for i, v2 := range val {
+			cp[i] = deepCopyAny(v2)
+		}
+		return cp
+	default:
+		return v
+	}
 }
 
 func loadItemsFromBytes(b []byte) ([]Monster, []string, []string, []string, error) {
