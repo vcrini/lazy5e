@@ -778,7 +778,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	}
 
 	ui.nameInput = tview.NewInputField().
-		SetLabel(" Name ").
+		SetLabel(" (n) Name ").
 		SetFieldWidth(26)
 	ui.nameInput.SetLabelColor(tcell.ColorGold)
 	ui.nameInput.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
@@ -796,7 +796,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	})
 
 	ui.envDrop = tview.NewDropDown().
-		SetLabel(" Env ")
+		SetLabel(" (e) Env ")
 	ui.envDrop.SetOptions(ui.envOptions, func(option string, _ int) {
 		if option == "All" {
 			ui.envFilter = ""
@@ -820,7 +820,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	})
 
 	ui.sourceDrop = tview.NewDropDown().
-		SetLabel(" Source ")
+		SetLabel(" (s) Source ")
 	ui.sourceDrop.SetLabelColor(tcell.ColorGold)
 	ui.sourceDrop.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
 	ui.sourceDrop.SetFieldTextColor(tcell.ColorWhite)
@@ -835,7 +835,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	})
 
 	ui.crDrop = tview.NewDropDown().
-		SetLabel(" CR ").
+		SetLabel(" (c) CR ").
 		SetOptions(ui.crOptions, func(option string, _ int) {
 			if option == "All" {
 				ui.crFilter = ""
@@ -859,7 +859,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 	})
 
 	ui.typeDrop = tview.NewDropDown().
-		SetLabel(" Type ").
+		SetLabel(" (t) Type ").
 		SetOptions(ui.typeOptions, func(option string, _ int) {
 			if option == "All" {
 				ui.typeFilter = ""
@@ -3811,11 +3811,11 @@ func (ui *UI) activeEntries() []Monster {
 func (ui *UI) setFilterOptionsForMode() {
 	switch ui.browseMode {
 	case BrowseItems:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Env ")
-		ui.sourceDrop.SetLabel(" Source ")
-		ui.crDrop.SetLabel(" Rarity ")
-		ui.typeDrop.SetLabel(" Type ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Env ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
+		ui.crDrop.SetLabel(" (r) Rarity ")
+		ui.typeDrop.SetLabel(" (t) Type ")
 		ui.envOptions = []string{"All"}
 		ui.sourceOptions = []string{"All"}
 		ui.crOptions = []string{"All"}
@@ -3839,11 +3839,11 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, keysSorted(seenCR)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenType)...)
 	case BrowseSpells:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Env ")
-		ui.sourceDrop.SetLabel(" Source ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Env ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
 		ui.crDrop.SetLabel(" Level ")
-		ui.typeDrop.SetLabel(" School ")
+		ui.typeDrop.SetLabel(" (c) School ")
 		ui.envOptions = []string{"All"}
 		ui.sourceOptions = []string{"All"}
 		ui.crOptions = []string{"All"}
@@ -3867,11 +3867,11 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, sortCR(keysSorted(seenCR))...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenType)...)
 	case BrowseCharacters:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Primary ")
-		ui.sourceDrop.SetLabel(" Source ")
-		ui.crDrop.SetLabel(" Hit Die ")
-		ui.typeDrop.SetLabel(" Caster ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Primary ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
+		ui.crDrop.SetLabel(" (c) Hit Die ")
+		ui.typeDrop.SetLabel(" (t) Caster ")
 		ui.envOptions = []string{"All"}
 		ui.sourceOptions = []string{"All"}
 		ui.crOptions = []string{"All"}
@@ -3901,11 +3901,11 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, keysSorted(seenHD)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenCaster)...)
 	case BrowseRaces:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Ability ")
-		ui.sourceDrop.SetLabel(" Source ")
-		ui.crDrop.SetLabel(" Size ")
-		ui.typeDrop.SetLabel(" Lineage ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Ability ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
+		ui.crDrop.SetLabel(" (c) Size ")
+		ui.typeDrop.SetLabel(" (t) Lineage ")
 		ui.envOptions = []string{"All"}
 		ui.sourceOptions = []string{"All"}
 		ui.crOptions = []string{"All"}
@@ -3935,11 +3935,11 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, keysSorted(seenSize)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenLineage)...)
 	case BrowseFeats:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Prereq ")
-		ui.sourceDrop.SetLabel(" Source ")
-		ui.crDrop.SetLabel(" Category ")
-		ui.typeDrop.SetLabel(" Ability ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Prereq ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
+		ui.crDrop.SetLabel(" (c) Category ")
+		ui.typeDrop.SetLabel(" (t) Ability ")
 		ui.envOptions = []string{"All"}
 		ui.sourceOptions = []string{"All"}
 		ui.crOptions = []string{"All"}
@@ -3969,11 +3969,11 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, keysSorted(seenCategory)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenAbility)...)
 	case BrowseBooks:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Group ")
-		ui.sourceDrop.SetLabel(" Source ")
-		ui.crDrop.SetLabel(" Year ")
-		ui.typeDrop.SetLabel(" Author ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Group ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
+		ui.crDrop.SetLabel(" (c) Year ")
+		ui.typeDrop.SetLabel(" (t) Author ")
 		ui.envOptions = []string{"All"}
 		ui.sourceOptions = []string{"All"}
 		ui.crOptions = []string{"All"}
@@ -4003,11 +4003,11 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, keysSorted(seenYear)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenAuthor)...)
 	case BrowseAdventures:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Group ")
-		ui.sourceDrop.SetLabel(" Source ")
-		ui.crDrop.SetLabel(" Year ")
-		ui.typeDrop.SetLabel(" Author ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Group ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
+		ui.crDrop.SetLabel(" (c) Year ")
+		ui.typeDrop.SetLabel(" (t) Author ")
 		ui.envOptions = []string{"All"}
 		ui.sourceOptions = []string{"All"}
 		ui.crOptions = []string{"All"}
@@ -4037,7 +4037,7 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, keysSorted(seenYear)...)
 		ui.typeOptions = append(ui.typeOptions, keysSorted(seenAuthor)...)
 	case BrowseNotes:
-		ui.nameInput.SetLabel(" Title ")
+		ui.nameInput.SetLabel(" (n) Title ")
 		ui.envDrop.SetLabel(" — ")
 		ui.sourceDrop.SetLabel(" — ")
 		ui.crDrop.SetLabel(" — ")
@@ -4047,7 +4047,7 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = []string{"All"}
 		ui.typeOptions = []string{"All"}
 	case BrowseRandom:
-		ui.nameInput.SetLabel(" Name ")
+		ui.nameInput.SetLabel(" (n) Name ")
 		ui.envDrop.SetLabel(" Category ")
 		ui.sourceDrop.SetLabel(" Source ")
 		ui.crDrop.SetLabel(" Group ")
@@ -4067,11 +4067,11 @@ func (ui *UI) setFilterOptionsForMode() {
 		ui.crOptions = append(ui.crOptions, []string{}...)
 		ui.typeOptions = append(ui.typeOptions, []string{}...)
 	default:
-		ui.nameInput.SetLabel(" Name ")
-		ui.envDrop.SetLabel(" Env ")
-		ui.sourceDrop.SetLabel(" Source ")
-		ui.crDrop.SetLabel(" CR ")
-		ui.typeDrop.SetLabel(" Type ")
+		ui.nameInput.SetLabel(" (n) Name ")
+		ui.envDrop.SetLabel(" (e) Env ")
+		ui.sourceDrop.SetLabel(" (s) Source ")
+		ui.crDrop.SetLabel(" (c) CR ")
+		ui.typeDrop.SetLabel(" (t) Type ")
 		ui.envOptions = append([]string{"All"}, ui.collectMonsterEnvOptions()...)
 		ui.sourceOptions = append([]string{"All"}, ui.collectMonsterSourceOptions()...)
 		ui.crOptions = append([]string{"All"}, ui.collectMonsterCROptions()...)
