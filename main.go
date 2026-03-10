@@ -604,6 +604,7 @@ type UI struct {
 	noteEditArea    *tview.TextArea
 	encounterUndo   []EncounterUndoState
 	encounterRedo   []EncounterUndoState
+	encounterYank   *EncounterEntry
 	diceUndo        []DiceUndoState
 	diceRedo        []DiceUndoState
 	turnMode        bool
@@ -1479,6 +1480,9 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'x':
 			ui.openEncounterConditionRemoveModal()
 			return nil
+		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'y':
+			ui.yankEncounterEntry()
+			return nil
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'C':
 			ui.clearEncounterConditions()
 			return nil
@@ -1555,7 +1559,11 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			ui.nextEncounterTurn()
 			return nil
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'p':
-			ui.prevEncounterTurn()
+			if ui.encounterYank != nil {
+				ui.pasteEncounterEntry()
+			} else {
+				ui.prevEncounterTurn()
+			}
 			return nil
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == ' ':
 			ui.toggleEncounterHPMode()
@@ -11213,6 +11221,67 @@ func (ui *UI) prevEncounterTurn() {
 	ui.encounter.SetCurrentItem(ui.turnIndex)
 	ui.renderDetailByEncounterIndex(ui.turnIndex)
 	ui.status.SetText(fmt.Sprintf(" [black:gold] turn[-:-] round %d, entry %d  %s", ui.turnRound, ui.turnIndex+1, helpText))
+}
+
+func (ui *UI) yankEncounterEntry() {
+	idx := ui.encounter.GetCurrentItem()
+	if idx < 0 || idx >= len(ui.encounterItems) {
+		return
+	}
+	e := ui.encounterItems[idx]
+	ui.encounterYank = &e
+	name := ui.encounterEntryDisplay(e)
+	ui.status.SetText(fmt.Sprintf(" [black:gold] copiato[-:-] %s  %s", name, helpText))
+}
+
+func (ui *UI) pasteEncounterEntry() {
+	if ui.encounterYank == nil {
+		return
+	}
+	ui.pushEncounterUndo()
+	src := *ui.encounterYank
+	var newEntry EncounterEntry
+	if src.Custom {
+		ordinal := ui.nextCustomOrdinal(src.CustomName)
+		newEntry = EncounterEntry{
+			MonsterIndex:     -1,
+			Ordinal:          ordinal,
+			Custom:           true,
+			CustomName:       src.CustomName,
+			CustomLevel:      src.CustomLevel,
+			CustomInit:       src.CustomInit,
+			CustomAC:         src.CustomAC,
+			CustomPassive:    src.CustomPassive,
+			HasCustomPassive: src.HasCustomPassive,
+			CustomMeta:       src.CustomMeta,
+			CustomBody:       src.CustomBody,
+			BaseHP:           src.BaseHP,
+			CurrentHP:        src.BaseHP,
+		}
+	} else {
+		ui.encounterSerial[src.MonsterIndex]++
+		ordinal := ui.encounterSerial[src.MonsterIndex]
+		newEntry = EncounterEntry{
+			MonsterIndex: src.MonsterIndex,
+			Ordinal:      ordinal,
+			BaseHP:       src.BaseHP,
+			CurrentHP:    src.BaseHP,
+			HPFormula:    src.HPFormula,
+		}
+	}
+	idx := ui.encounter.GetCurrentItem()
+	insertAt := idx + 1
+	if insertAt > len(ui.encounterItems) {
+		insertAt = len(ui.encounterItems)
+	}
+	ui.encounterItems = append(ui.encounterItems, EncounterEntry{})
+	copy(ui.encounterItems[insertAt+1:], ui.encounterItems[insertAt:])
+	ui.encounterItems[insertAt] = newEntry
+	ui.renderEncounterList()
+	ui.encounter.SetCurrentItem(insertAt)
+	ui.renderDetailByEncounterIndex(insertAt)
+	name := ui.encounterEntryDisplay(newEntry)
+	ui.status.SetText(fmt.Sprintf(" [black:gold] incollato[-:-] %s  %s", name, helpText))
 }
 
 func (ui *UI) bumpAllEncounterConditionRounds(delta int) {
