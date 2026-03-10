@@ -1559,11 +1559,7 @@ func newUI(monsters, items, spells, classes, races, feats, books, advs []Monster
 			ui.nextEncounterTurn()
 			return nil
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == 'p':
-			if ui.encounterYank != nil {
-				ui.pasteEncounterEntry()
-			} else {
-				ui.prevEncounterTurn()
-			}
+			ui.pasteEncounterEntry()
 			return nil
 		case focus == ui.encounter && event.Key() == tcell.KeyRune && event.Rune() == ' ':
 			ui.toggleEncounterHPMode()
@@ -2205,7 +2201,8 @@ func (ui *UI) helpForFocus(focus tview.Primitive) string {
 			"  V : roll a saving throw vs DC (save type + bonus + DC)\n" +
 			"  S : sort entries by initiative roll\n" +
 			"  * : toggle turn mode\n" +
-			"  n / p : next / previous turn\n" +
+			"  n : next turn\n" +
+			"  y / p : yank / paste encounter entry\n" +
 			"  u : undo last encounter operation\n" +
 			"  r : redo undone encounter operation\n" +
 			"  c : add/remove conditions (multi select)\n" +
@@ -11197,25 +11194,6 @@ func (ui *UI) nextEncounterTurn() {
 		ui.bumpAllEncounterConditionRounds(1)
 	} else {
 		ui.turnIndex++
-	}
-	ui.renderEncounterList()
-	ui.encounter.SetCurrentItem(ui.turnIndex)
-	ui.renderDetailByEncounterIndex(ui.turnIndex)
-	ui.status.SetText(fmt.Sprintf(" [black:gold] turn[-:-] round %d, entry %d  %s", ui.turnRound, ui.turnIndex+1, helpText))
-}
-
-func (ui *UI) prevEncounterTurn() {
-	if !ui.turnMode || len(ui.encounterItems) == 0 {
-		return
-	}
-	if ui.turnIndex <= 0 {
-		ui.turnIndex = len(ui.encounterItems) - 1
-		if ui.turnRound > 1 {
-			ui.turnRound--
-			ui.bumpAllEncounterConditionRounds(-1)
-		}
-	} else {
-		ui.turnIndex--
 	}
 	ui.renderEncounterList()
 	ui.encounter.SetCurrentItem(ui.turnIndex)
